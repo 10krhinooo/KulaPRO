@@ -9,6 +9,7 @@ poor accomodation planning . Through this project we hope to improve the custome
 ## Requirements
 1. Android Studio
 2. JDK version 17
+3. compile SDK verision  35
 
 ## Installation
 
