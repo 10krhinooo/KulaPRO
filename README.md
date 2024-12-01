@@ -14,8 +14,14 @@ poor accomodation planning . Through this project we hope to improve the custome
 ## Installation
 
 1. Clone the repo using the command below
-   > git clone https://github.com/Chege-Gitiche/KulaPro.git
+   > git clone https://github.com/10krhinooo/KulaPRO.git
 
 2.Open the project with Android Studio
 3.Let the Gradle build
 4.Have fun coding
+
+## Current Functionalities
+1. Authentication (Sign up and login)
+2. Forget password functionality 
+3. Restaurant reservation (Time, Date and Number of people)
+4. Change password Functionality 
