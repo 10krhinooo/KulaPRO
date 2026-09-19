@@ -1,7 +1,6 @@
 package com.example.kulapro.pages
 
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -9,136 +8,128 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Email
 import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
-import com.google.firebase.auth.FirebaseAuth
+import com.example.kulapro.data.repository.AuthRepository
+import com.example.kulapro.data.repository.AuthRepositoryFirebase
+import com.example.kulapro.data.repository.Result
+import com.example.kulapro.util.Validators
+import kotlinx.coroutines.launch
 
 @Composable
-fun ForgotPasswordScreen(navController: NavController) {
-    val auth = FirebaseAuth.getInstance()
+fun ForgotPasswordScreen(
+    navController: NavController,
+    modifier: Modifier = Modifier,
+    authRepository: AuthRepository = remember { AuthRepositoryFirebase() },
+) {
+    val scope = rememberCoroutineScope()
+    val snackbarHostState = remember { SnackbarHostState() }
+
     var email by remember { mutableStateOf("") }
-    var message by remember { mutableStateOf("") }
-    val coroutineScope = rememberCoroutineScope()
-    var feedbackMessage by remember { mutableStateOf("") }
-    var showSnackbar by remember { mutableStateOf(false) }
-    var formError by remember { mutableStateOf(false) }
+    var emailError by remember { mutableStateOf<String?>(null) }
+    var sentTo by remember { mutableStateOf<String?>(null) }
+    var isSubmitting by remember { mutableStateOf(false) }
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(16.dp),
-        verticalArrangement = Arrangement.Center,
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        Text(
-            text = "Forgot Password",
-            fontSize = 24.sp,
-            style = MaterialTheme.typography.titleLarge,
-        )
-
-        Spacer(modifier = Modifier.height(16.dp))
-
-        // Email Input
-        OutlinedTextField(
-            value = email,
-            onValueChange = { newValue ->
-                email = newValue
-                formError = false // Clear error when user starts typing
-            },
-            placeholder = { Text(text = "E-mail") },
-            leadingIcon = {
-                Icon(imageVector = Icons.Rounded.Email, contentDescription = null)
-            },
-            isError = formError && email.isEmpty(),
-            shape = RoundedCornerShape(20.dp),
-            modifier = Modifier.fillMaxWidth()
-        )
-        if (formError && email.isEmpty()) {
-            Text(
-                text = "Email is required",
-                color = MaterialTheme.colorScheme.error,
-                style = MaterialTheme.typography.bodySmall
-            )
-        }
-
-        Spacer(modifier = Modifier.height(16.dp))
-
-        // Send Reset Email Button
-        Button(
-            onClick = {
-                if (email.isNotEmpty()) {
-                    auth.sendPasswordResetEmail(email)
-                        .addOnCompleteListener { task ->
-                            if (task.isSuccessful) {
-                                message = "Reset email sent to $email"
-                                navController.navigate("login")
-                            } else {
-                                message = task.exception?.localizedMessage ?: "Error occurred"
-                            }
-                        }
-                } else {
-                    message = "Email cannot be empty"
-                }
-            },
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Text("Send Reset Email")
-        }
-
-        Spacer(modifier = Modifier.height(10.dp))
-
-        Box(
+    Scaffold(
+        modifier = modifier,
+        snackbarHost = { SnackbarHost(snackbarHostState) },
+    ) { padding ->
+        Column(
             modifier = Modifier
-                .fillMaxWidth()
-                .padding(vertical = 12.dp),
-
-            contentAlignment = Alignment.Center
-        ){
-            Text(text = "Already have an account ?",
-                fontWeight = FontWeight.Bold,
-                style = MaterialTheme.typography.titleMedium,
-                modifier = Modifier.padding(vertical=4.dp))
-        }
-
-        Spacer(modifier = Modifier.height(10.dp))
-
-        Button(
-            onClick = {
-                navController.navigate("login")
-            },
-            modifier = Modifier.fillMaxWidth()
+                .fillMaxSize()
+                .padding(padding)
+                .padding(24.dp),
+            verticalArrangement = Arrangement.Center,
         ) {
-            Text(text = "Login",
-                fontWeight = FontWeight.Bold,
-                style = MaterialTheme.typography.titleMedium,
-                modifier = Modifier.padding(vertical=4.dp)
+            Text(
+                text = "Reset your password",
+                style = MaterialTheme.typography.headlineMedium,
             )
+            Spacer(Modifier.height(8.dp))
+            Text(
+                text = "We will email you a link to set a new one.",
+                style = MaterialTheme.typography.bodyMedium,
+            )
+
+            Spacer(Modifier.height(24.dp))
+
+            OutlinedTextField(
+                value = email,
+                onValueChange = {
+                    email = it
+                    emailError = null
+                    sentTo = null
+                },
+                label = { Text("Email") },
+                leadingIcon = { Icon(Icons.Rounded.Email, contentDescription = null) },
+                isError = emailError != null,
+                supportingText = emailError?.let { { Text(it) } },
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
+                singleLine = true,
+                shape = RoundedCornerShape(16.dp),
+                modifier = Modifier.fillMaxWidth(),
+            )
+
+            Spacer(Modifier.height(16.dp))
+
+            Button(
+                onClick = {
+                    emailError = Validators.emailError(email)
+                    if (emailError != null) return@Button
+                    isSubmitting = true
+                    scope.launch {
+                        val target = email.trim()
+                        val result = authRepository.sendPasswordReset(target)
+                        isSubmitting = false
+                        when (result) {
+                            // Stay on the screen so the confirmation is actually readable.
+                            // The first version set a message then navigated away instantly.
+                            is Result.Success -> sentTo = target
+                            is Result.Failure -> snackbarHostState.showSnackbar(result.message)
+                        }
+                    }
+                },
+                enabled = !isSubmitting,
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Text(if (isSubmitting) "Sending..." else "Send reset link")
+            }
+
+            sentTo?.let { target ->
+                Spacer(Modifier.height(16.dp))
+                Text(
+                    text = "Reset link sent to $target. Check your inbox, and your spam folder.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.primary,
+                )
+            }
+
+            Spacer(Modifier.height(8.dp))
+
+            TextButton(
+                onClick = { navController.popBackStack() },
+                modifier = Modifier.fillMaxWidth(),
+            ) { Text("Back to sign in") }
         }
-
-            Spacer(modifier = Modifier.height(10.dp))
-
-        // Message Display
-        Text(
-            text = message,
-            color = if (message.contains("sent")) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error,
-            fontSize = 16.sp
-        )
     }
 }

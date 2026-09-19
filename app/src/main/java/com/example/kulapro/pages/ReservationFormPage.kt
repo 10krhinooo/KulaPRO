@@ -1,211 +1,301 @@
 package com.example.kulapro.pages
 
-
 import android.app.DatePickerDialog
-import android.widget.Toast
-import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextField
+import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
-import com.google.firebase.database.FirebaseDatabase
+import com.example.kulapro.data.model.Reservation
+import com.example.kulapro.data.repository.ReservationRepository
+import com.example.kulapro.data.repository.ReservationRepositoryFirestore
+import com.example.kulapro.data.repository.RestaurantRepository
+import com.example.kulapro.data.repository.RestaurantRepositoryFirestore
+import com.example.kulapro.data.repository.Result
+import com.example.kulapro.domain.AvailabilityCalculator
+import com.example.kulapro.util.Validators
+import com.google.firebase.Timestamp
+import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Calendar
+import java.util.Date
 import java.util.Locale
 
+/**
+ * Booking form.
+ *
+ * Differs from the first version in three ways that matter: it books the restaurant the user
+ * actually tapped rather than a hardcoded "The Bistro", it offers only slots the restaurant
+ * can still seat rather than a fixed list of nineteen times, and it navigates away only after
+ * the write succeeds.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ReservationFormScreen(
-    onReservationSuccess: Modifier, navController: NavController, // Pass a lambda for success handling
-    database: FirebaseDatabase = FirebaseDatabase.getInstance(),
-
+    navController: NavController,
+    restaurantId: String,
+    restaurantName: String,
+    modifier: Modifier = Modifier,
+    reservationRepository: ReservationRepository = remember { ReservationRepositoryFirestore() },
+    restaurantRepository: RestaurantRepository = remember { RestaurantRepositoryFirestore() },
 ) {
-    val reservationsRef = remember { database.getReference("reservations") }
-
-    var reservationDate by remember { mutableStateOf("") }
-    var numberOfPax by remember { mutableStateOf("") }
-    var selectedTimeSlot by remember { mutableStateOf("") }
-    val timeSlots = listOf(
-        "12:00 PM", "12:30 PM", "1:00 PM", "1:30 PM", "2:00 PM", "2:30 PM",
-        "3:00 PM", "3:30 PM", "4:00 PM", "4:30 PM", "5:00 PM", "5:30 PM",
-        "6:00 PM", "6:30 PM", "7:00 PM", "7:30 PM", "8:00 PM", "8:30 PM", "9:00 PM"
-    )
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val snackbarHostState = remember { SnackbarHostState() }
+    val dateFormat = remember { SimpleDateFormat("EEE d MMM yyyy", Locale.getDefault()) }
 
-    var showDatePicker by remember { mutableStateOf(false) }
+    var selectedDate by remember { mutableStateOf<Date?>(null) }
+    var partySize by remember { mutableStateOf("2") }
+    var selectedSlot by remember { mutableStateOf<AvailabilityCalculator.Slot?>(null) }
+    var slots by remember { mutableStateOf<List<AvailabilityCalculator.Slot>>(emptyList()) }
+    var partySizeError by remember { mutableStateOf<String?>(null) }
+    var isLoadingSlots by remember { mutableStateOf(false) }
+    var isSubmitting by remember { mutableStateOf(false) }
 
-    if (showDatePicker) {
-        val calendar = Calendar.getInstance()
-        DatePickerDialog(
-            context,
-            { _, year, month, dayOfMonth ->
-                val selectedDate = Calendar.getInstance()
-                selectedDate.set(year, month, dayOfMonth)
-                val sdf = SimpleDateFormat("dd/MM/yyyy", Locale.US)
-                reservationDate = sdf.format(selectedDate.time)
-                showDatePicker = false
-            },
-            calendar.get(Calendar.YEAR),
-            calendar.get(Calendar.MONTH),
-            calendar.get(Calendar.DAY_OF_MONTH)
-        ).show()
-    }
+    // Recompute availability whenever the day or party size changes. Selecting a slot then
+    // raising the party size must be able to invalidate that slot.
+    LaunchedEffect(selectedDate, partySize, restaurantId) {
+        val day = selectedDate ?: return@LaunchedEffect
+        val size = partySize.toIntOrNull() ?: return@LaunchedEffect
+        isLoadingSlots = true
+        selectedSlot = null
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(16.dp)
-            .background(Color(0xFF4AAF42)),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
-    ) {
-        Text(
-            text = "KulaPro",
-            style = MaterialTheme.typography.headlineMedium.copy(color = Color.White),
-            modifier = Modifier.fillMaxWidth(),
-            textAlign = TextAlign.Center
-        )
+        when (val restaurant = restaurantRepository.restaurant(restaurantId)) {
+            is Result.Failure -> {
+                slots = emptyList()
+                snackbarHostState.showSnackbar(restaurant.message)
+            }
 
-        OutlinedTextField(
-            value = reservationDate,
-            onValueChange = { reservationDate = it },
-            label = { Text("Reservation Date", color = Color.White) },
-            placeholder = { Text("Select Date") },
-            modifier = Modifier.fillMaxWidth(),
-            readOnly = true,
-            trailingIcon = {
-                IconButton(onClick = { showDatePicker = true }) {
-                    Icon(Icons.Default.DateRange, contentDescription = "Pick a date", tint = Color.White)
+            is Result.Success -> {
+                val dayStart = startOfDay(day)
+                val dayEnd = startOfDay(Date(day.time + DAY_MILLIS))
+                when (
+                    val existing = reservationRepository.reservationsFor(
+                        restaurantId = restaurantId,
+                        from = Timestamp(dayStart),
+                        to = Timestamp(dayEnd),
+                    )
+                ) {
+                    is Result.Failure -> {
+                        slots = emptyList()
+                        snackbarHostState.showSnackbar(existing.message)
+                    }
+
+                    is Result.Success -> {
+                        slots = AvailabilityCalculator.slotsFor(
+                            restaurant = restaurant.data,
+                            day = day,
+                            existing = existing.data,
+                            partySize = size,
+                        )
+                    }
                 }
             }
-        )
-
-        DropdownMenuWithLabel(
-            label = "Reservation Time Slot",
-            options = timeSlots,
-            selectedOption = selectedTimeSlot,
-            onOptionSelected = { selectedTimeSlot = it }
-        )
-
-        OutlinedTextField(
-            value = numberOfPax,
-            onValueChange = { numberOfPax = it },
-            label = { Text("Number of Pax", color = Color.White) },
-            placeholder = { Text("Enter Number of Pax") },
-            modifier = Modifier.fillMaxWidth(),
-            keyboardOptions = KeyboardOptions.Default.copy(keyboardType = KeyboardType.Number)
-        )
-
-        Button(
-            onClick = {
-                if (reservationDate.isNotEmpty() && selectedTimeSlot.isNotEmpty() && numberOfPax.isNotEmpty()) {
-                    val reservationId = reservationsRef.push().key
-                    val reservation = Reservation(
-                        restaurantName = "The Bistro",
-                        reservationDate = reservationDate,
-                        timeSlot = selectedTimeSlot,
-                        numberOfPax = numberOfPax.toInt()
-                    )
-                    if (reservationId != null) {
-                        reservationsRef.child(reservationId).setValue(reservation)
-                            .addOnSuccessListener {
-                                Toast.makeText(context, "Reservation Successful!", Toast.LENGTH_SHORT).show()
-                                onReservationSuccess
-                            }
-                            .addOnFailureListener {
-                                Toast.makeText(context, "Failed to make reservation. Try again.", Toast.LENGTH_SHORT).show()
-                            }
-                        navController.navigate("home")
-                    }
-                } else {
-                    Toast.makeText(context, "Please fill in all fields", Toast.LENGTH_SHORT).show()
-                }
-            },
-            colors = ButtonDefaults.buttonColors(Color.White),
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Text("Submit", color = Color.Black)
         }
+        isLoadingSlots = false
     }
-}
 
-@Composable
-fun DropdownMenuWithLabel(
-    label: String,
-    options: List<String>,
-    selectedOption: String,
-    onOptionSelected: (String) -> Unit
-) {
-    var expanded by remember { mutableStateOf(false) }
-
-    Column {
-        Text(label, color = Color.White)
-        Box(
-            Modifier
-                .fillMaxWidth()
-                .padding(top = 4.dp)
+    Scaffold(
+        modifier = modifier,
+        topBar = { TopAppBar(title = { Text(restaurantName.ifBlank { "Book a table" }) }) },
+        snackbarHost = { SnackbarHost(snackbarHostState) },
+    ) { padding ->
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding)
+                .padding(16.dp)
+                .verticalScroll(rememberScrollState()),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
-            TextField(
-                value = selectedOption,
+            OutlinedTextField(
+                value = selectedDate?.let(dateFormat::format).orEmpty(),
                 onValueChange = {},
                 readOnly = true,
+                label = { Text("Date") },
+                placeholder = { Text("Choose a date") },
+                modifier = Modifier.fillMaxWidth(),
                 trailingIcon = {
-                    IconButton(onClick = { expanded = true }) {
-                        Icon(Icons.Default.ArrowDropDown, contentDescription = "Dropdown")
+                    IconButton(onClick = { showDatePicker(context) { selectedDate = it } }) {
+                        Icon(Icons.Default.DateRange, contentDescription = "Pick a date")
                     }
                 },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable { expanded = true },
             )
-            DropdownMenu(
-                expanded = expanded,
-                onDismissRequest = { expanded = false }
-            ) {
-                options.forEach { option ->
-                    DropdownMenuItem(
-                        text = { Text(option) },
-                        onClick = {
-                            onOptionSelected(option)
-                            expanded = false
-                        }
+
+            OutlinedTextField(
+                value = partySize,
+                onValueChange = {
+                    partySize = it
+                    partySizeError = Validators.partySizeError(it)
+                },
+                label = { Text("Number of guests") },
+                isError = partySizeError != null,
+                supportingText = partySizeError?.let { { Text(it) } },
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                modifier = Modifier.fillMaxWidth(),
+            )
+
+            Text("Available times", style = MaterialTheme.typography.titleMedium)
+
+            when {
+                selectedDate == null ->
+                    Text(
+                        "Pick a date to see what is free.",
+                        style = MaterialTheme.typography.bodyMedium,
                     )
-                }
+
+                isLoadingSlots ->
+                    Box(
+                        modifier = Modifier.fillMaxWidth(),
+                        contentAlignment = Alignment.Center,
+                    ) { CircularProgressIndicator() }
+
+                slots.isEmpty() ->
+                    Text(
+                        "This restaurant is not open on that day.",
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
+
+                slots.none { it.isAvailable } ->
+                    Text(
+                        "Fully booked for a party of $partySize. Try another date.",
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
+
+                else -> SlotGrid(
+                    slots = slots,
+                    selected = selectedSlot,
+                    onSelect = { selectedSlot = it },
+                )
+            }
+
+            Button(
+                onClick = {
+                    val slot = selectedSlot ?: return@Button
+                    val size = partySize.toIntOrNull() ?: return@Button
+                    isSubmitting = true
+                    scope.launch {
+                        val result = reservationRepository.create(
+                            Reservation(
+                                restaurantId = restaurantId,
+                                restaurantName = restaurantName,
+                                startsAt = Timestamp(slot.startsAt),
+                                partySize = size,
+                            ),
+                        )
+                        isSubmitting = false
+                        when (result) {
+                            // Navigate only on success. The first version navigated home
+                            // unconditionally, so a failed write still looked like a booking.
+                            is Result.Success -> navController.navigate("reservation") {
+                                popUpTo("home")
+                            }
+
+                            is Result.Failure -> snackbarHostState.showSnackbar(result.message)
+                        }
+                    }
+                },
+                enabled = !isSubmitting &&
+                    selectedSlot != null &&
+                    partySizeError == null &&
+                    partySize.isNotBlank(),
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Text(if (isSubmitting) "Booking..." else "Confirm booking")
             }
         }
     }
 }
 
-data class Reservation(
-    val restaurantName: String,
-    val reservationDate: String,
-    val timeSlot: String,
-    val numberOfPax: Int
-)
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun SlotGrid(
+    slots: List<AvailabilityCalculator.Slot>,
+    selected: AvailabilityCalculator.Slot?,
+    onSelect: (AvailabilityCalculator.Slot) -> Unit,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        slots.chunked(3).forEach { row ->
+            androidx.compose.foundation.layout.Row(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                row.forEach { slot ->
+                    FilterChip(
+                        selected = selected?.startsAt == slot.startsAt,
+                        onClick = { onSelect(slot) },
+                        enabled = slot.isAvailable,
+                        label = { Text(slot.label) },
+                        colors = FilterChipDefaults.filterChipColors(),
+                        modifier = Modifier.weight(1f),
+                    )
+                }
+                repeat(3 - row.size) { Box(Modifier.weight(1f)) }
+            }
+        }
+    }
+}
+
+private const val DAY_MILLIS = 24L * 60 * 60 * 1000
+
+private fun startOfDay(date: Date): Date = Calendar.getInstance().apply {
+    time = date
+    set(Calendar.HOUR_OF_DAY, 0)
+    set(Calendar.MINUTE, 0)
+    set(Calendar.SECOND, 0)
+    set(Calendar.MILLISECOND, 0)
+}.time
+
+private fun showDatePicker(context: android.content.Context, onPicked: (Date) -> Unit) {
+    val now = Calendar.getInstance()
+    DatePickerDialog(
+        context,
+        { _, year, month, dayOfMonth ->
+            onPicked(
+                Calendar.getInstance().apply {
+                    set(year, month, dayOfMonth, 0, 0, 0)
+                    set(Calendar.MILLISECOND, 0)
+                }.time,
+            )
+        },
+        now.get(Calendar.YEAR),
+        now.get(Calendar.MONTH),
+        now.get(Calendar.DAY_OF_MONTH),
+    ).apply {
+        // A booking in the past is never valid, so the picker should not offer one.
+        datePicker.minDate = now.timeInMillis
+    }.show()
+}

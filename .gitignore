@@ -1,0 +1,26 @@
+# Gradle
+.gradle/
+build/
+captures/
+.cxx/
+
+# Local configuration (machine-specific; contains SDK path and API keys)
+local.properties
+
+# Android Studio / IntelliJ
+*.iml
+.idea/
+.DS_Store
+
+# Keystores - never commit signing material
+*.jks
+*.keystore
+
+# Firebase / Node
+functions/node_modules/
+functions/lib/
+node_modules/
+.firebase/
+firebase-debug.log
+firestore-debug.log
+ui-debug.log

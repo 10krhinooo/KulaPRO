@@ -1,0 +1,136 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ---- helpers -------------------------------------------------------------
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isSelf(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    // Authorisation reads Firebase Auth custom claims, never a Firestore field.
+    // A `role` field in a user's own document is writable by that user, so gating on
+    // it would let any client promote itself to owner.
+    function role() {
+      return isSignedIn() ? request.auth.token.get('role', 'DINER') : 'DINER';
+    }
+
+    function isPlatformAdmin() {
+      return role() == 'PLATFORM_ADMIN';
+    }
+
+    function managesRestaurant(restaurantId) {
+      return isSignedIn() && (
+        isPlatformAdmin() ||
+        restaurantId in request.auth.token.get('managedRestaurants', [])
+      );
+    }
+
+    // ---- users ---------------------------------------------------------------
+
+    match /users/{userId} {
+      allow read: if isSelf(userId) || isPlatformAdmin();
+
+      // On create the role must be the default. On update it must not change.
+      // Privilege is granted only by a Cloud Function setting a custom claim.
+      allow create: if isSelf(userId)
+                    && request.resource.data.get('role', 'DINER') == 'DINER';
+
+      allow update: if isSelf(userId)
+                    && request.resource.data.get('role', 'DINER')
+                       == resource.data.get('role', 'DINER');
+
+      allow delete: if false;
+    }
+
+    // ---- restaurants and menus ----------------------------------------------
+
+    match /restaurants/{restaurantId} {
+      allow read: if true;
+      allow write: if managesRestaurant(restaurantId);
+
+      match /menuItems/{menuItemId} {
+        allow read: if true;
+        allow write: if managesRestaurant(restaurantId);
+      }
+
+      // Denormalised counters are maintained only by trusted server code.
+      match /stats/{statId} {
+        allow read: if managesRestaurant(restaurantId);
+        allow write: if false;
+      }
+
+      match /reviews/{reviewId} {
+        allow read: if true;
+
+        // A review is only accepted when the author actually ate there: the referenced
+        // reservation must belong to them and be COMPLETED. This makes fake reviews
+        // structurally hard rather than merely discouraged.
+        allow create: if isSignedIn()
+          && request.resource.data.userId == request.auth.uid
+          && request.resource.data.restaurantId == restaurantId
+          && request.resource.data.rating is int
+          && request.resource.data.rating >= 1
+          && request.resource.data.rating <= 5
+          && exists(/databases/$(database)/documents/reservations/$(request.resource.data.reservationId))
+          && get(/databases/$(database)/documents/reservations/$(request.resource.data.reservationId)).data.userId == request.auth.uid
+          && get(/databases/$(database)/documents/reservations/$(request.resource.data.reservationId)).data.restaurantId == restaurantId
+          && get(/databases/$(database)/documents/reservations/$(request.resource.data.reservationId)).data.status == 'COMPLETED';
+
+        // Authors may edit their own text; the owner may only add a reply.
+        allow update: if (isSignedIn() && resource.data.userId == request.auth.uid
+                          && request.resource.data.userId == resource.data.userId
+                          && request.resource.data.reservationId == resource.data.reservationId)
+                      || managesRestaurant(restaurantId);
+
+        allow delete: if isSignedIn() && resource.data.userId == request.auth.uid;
+      }
+    }
+
+    // ---- reservations --------------------------------------------------------
+
+    match /reservations/{reservationId} {
+      allow read: if isSignedIn() && (
+        resource.data.userId == request.auth.uid ||
+        managesRestaurant(resource.data.restaurantId)
+      );
+
+      // userId is pinned to the caller, so a client cannot book on someone else's behalf
+      // or write a reservation it would then be unable to read.
+      allow create: if isSignedIn()
+        && request.resource.data.userId == request.auth.uid
+        && request.resource.data.partySize is int
+        && request.resource.data.partySize > 0
+        && request.resource.data.status == 'PENDING';
+
+      // Diners may change their own booking but never reassign its owner.
+      allow update: if isSignedIn() && (
+        (resource.data.userId == request.auth.uid
+          && request.resource.data.userId == resource.data.userId)
+        || managesRestaurant(resource.data.restaurantId)
+      );
+
+      // Cancellation is a status change, so history and analytics stay intact.
+      allow delete: if false;
+    }
+
+    // ---- scanner cache -------------------------------------------------------
+
+    // Written only by the Cloud Function (Admin SDK bypasses rules). Clients may read a
+    // cached result but must never be able to poison it.
+    match /nutritionCache/{hash} {
+      allow read: if isSignedIn();
+      allow write: if false;
+    }
+
+    // Anything not matched above is denied.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

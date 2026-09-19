@@ -1,182 +1,245 @@
 package com.example.kulapro.pages
 
-
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.Button
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
+import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
-import com.google.firebase.auth.FirebaseAuth
+import com.example.kulapro.Routes
+import com.example.kulapro.data.repository.AuthRepository
+import com.example.kulapro.data.repository.AuthRepositoryFirebase
+import com.example.kulapro.data.repository.Result
+import com.example.kulapro.util.Validators
+import kotlinx.coroutines.launch
 
-
+/**
+ * Profile and credential management.
+ *
+ * Firebase refuses credential changes without a recent sign-in, so both actions here take the
+ * current password and re-authenticate first. The first version omitted that step, which is
+ * why its "Change password" button reliably failed once a session was more than a few
+ * minutes old.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ProfilePage(navController: NavController, modifier: Modifier = Modifier) {
-    val context = LocalContext.current
-    val auth = FirebaseAuth.getInstance()
+fun ProfilePage(
+    navController: NavController,
+    modifier: Modifier = Modifier,
+    authRepository: AuthRepository = remember { AuthRepositoryFirebase() },
+) {
+    val scope = rememberCoroutineScope()
+    val snackbarHostState = remember { SnackbarHostState() }
 
-    // State for user input
-    var email by remember { mutableStateOf(auth.currentUser?.email ?: "") }
+    var currentPassword by remember { mutableStateOf("") }
     var newEmail by remember { mutableStateOf("") }
-    var password by remember { mutableStateOf("") }
-    var feedbackMessage by remember { mutableStateOf("") }
-    var passwordVisibility by remember { mutableStateOf(false) }
-    var isLoading by remember { mutableStateOf(false) }
+    var newPassword by remember { mutableStateOf("") }
+    var newEmailError by remember { mutableStateOf<String?>(null) }
+    var newPasswordError by remember { mutableStateOf<String?>(null) }
+    var passwordVisible by remember { mutableStateOf(false) }
+    var isBusy by remember { mutableStateOf(false) }
 
-    // Function to update email
-    fun updateEmail() {
-        val user = auth.currentUser
-        if (newEmail.isNotEmpty() && user != null) {
-            isLoading = true
-            user.updateEmail(newEmail).addOnCompleteListener { task ->
-                isLoading = false
-                if (task.isSuccessful) {
-                    feedbackMessage = "Email updated successfully!"
-                    user.sendEmailVerification() // Optionally send a verification email
-                } else {
-                    feedbackMessage = "Failed to update email: ${task.exception?.message}"
-                }
-            }
-        } else {
-            feedbackMessage = "Please enter a new email address."
-        }
-    }
-
-    // Function to change password
-    fun changePassword() {
-        val user = auth.currentUser
-        if (password.isNotEmpty() && user != null) {
-            isLoading = true
-            user.updatePassword(password).addOnCompleteListener { task ->
-                isLoading = false
-                if (task.isSuccessful) {
-                    feedbackMessage = "Password changed successfully!"
-                    // Optionally, send email after password change
-                    user.sendEmailVerification()
-                } else {
-                    feedbackMessage = "Failed to change password: ${task.exception?.message}"
-                }
-            }
-        } else {
-            feedbackMessage = "Please enter a new password."
-        }
-    }
-
-    // Function to log out
-    fun logOut() {
-        auth.signOut()
-        // Navigate back to the login screen after logout
-        navController.navigate("login") {
-            popUpTo("login") { inclusive = true } // Clear the back stack to avoid navigating back to the profile page
-        }
-    }
-
-    // UI
-    Column(modifier = modifier.padding(16.dp)) {
-        Text("Update Profile",  style = MaterialTheme.typography.displayMedium)
-
-        Spacer(modifier = Modifier.height(16.dp))
-
-        // Email field
-        OutlinedTextField(
-            value = newEmail,
-            onValueChange = { newEmail = it },
-            label = { Text("New Email Address") },
-            modifier = Modifier.fillMaxWidth(),
-            keyboardOptions = KeyboardOptions.Default.copy(keyboardType = KeyboardType.Email),
-            isError = feedbackMessage.contains("Failed")
-        )
-
-        Spacer(modifier = Modifier.height(16.dp))
-
-        // Password field
-        OutlinedTextField(
-            value = password,
-            onValueChange = { password = it },
-            label = { Text("New Password") },
-            visualTransformation = if (passwordVisibility) VisualTransformation.None else PasswordVisualTransformation(),
-            keyboardOptions = KeyboardOptions.Default.copy(keyboardType = KeyboardType.Password),
-            trailingIcon = {
-                IconButton(onClick = { passwordVisibility = !passwordVisibility }) {
-                    Icon(
-                        imageVector = if (passwordVisibility) Icons.Filled.Visibility else Icons.Filled.VisibilityOff,
-                        contentDescription = "Toggle password visibility"
-                    )
-                }
-            },
-            modifier = Modifier.fillMaxWidth(),
-            isError = feedbackMessage.contains("Failed")
-        )
-
-        Spacer(modifier = Modifier.height(16.dp))
-
-        // Update email button
-        Button(
-            onClick = { updateEmail() },
-            modifier = Modifier.fillMaxWidth(),
-            enabled = !isLoading
-        ) {
-            Text("Change Email")
-        }
-
-        Spacer(modifier = Modifier.height(16.dp))
-
-        // Change password button
-        Button(
-            onClick = { changePassword() },
-            modifier = Modifier.fillMaxWidth(),
-            enabled = !isLoading
-        ) {
-            Text("Change Password")
-        }
-
-        Spacer(modifier = Modifier.height(16.dp))
-
-        // Loading indicator
-//        if (isLoading) {
-//            CircularProgressIndicator(modifier = Modifier.align(LineHeightStyle.Alignment.Center))
-//        }
-
-        // Feedback message
-        if (feedbackMessage.isNotEmpty()) {
-            Text(
-                text = feedbackMessage,
-                color = if (feedbackMessage.contains("successfully")) Color.Green else Color.Red,
-                style = MaterialTheme.typography.displayMedium
+    Scaffold(
+        modifier = modifier,
+        topBar = {
+            TopAppBar(
+                title = { Text("Profile") },
+                actions = {
+                    IconButton(onClick = { navController.navigate(Routes.SETTINGS) }) {
+                        Icon(Icons.Filled.Settings, contentDescription = "Settings")
+                    }
+                },
             )
-        }
-
-        Spacer(modifier = Modifier.height(16.dp))
-
-        // Logout button
-        Button(
-            onClick = { logOut() },
-            modifier = Modifier.fillMaxWidth(),
-
+        },
+        snackbarHost = { SnackbarHost(snackbarHostState) },
+    ) { padding ->
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding)
+                .padding(16.dp)
+                .verticalScroll(rememberScrollState()),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
-            Text("Log Out", color = Color.White)
+            Text(
+                text = authRepository.currentUserEmail ?: "Not signed in",
+                style = MaterialTheme.typography.titleMedium,
+            )
+
+            HorizontalDivider()
+
+            Text("Change your details", style = MaterialTheme.typography.titleSmall)
+            Text(
+                "For security, confirm your current password before making a change.",
+                style = MaterialTheme.typography.bodySmall,
+            )
+
+            OutlinedTextField(
+                value = currentPassword,
+                onValueChange = { currentPassword = it },
+                label = { Text("Current password") },
+                trailingIcon = {
+                    IconButton(onClick = { passwordVisible = !passwordVisible }) {
+                        Icon(
+                            imageVector = if (passwordVisible) {
+                                Icons.Filled.Visibility
+                            } else {
+                                Icons.Filled.VisibilityOff
+                            },
+                            contentDescription = if (passwordVisible) {
+                                "Hide password"
+                            } else {
+                                "Show password"
+                            },
+                        )
+                    }
+                },
+                visualTransformation = if (passwordVisible) {
+                    VisualTransformation.None
+                } else {
+                    PasswordVisualTransformation()
+                },
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth(),
+            )
+
+            OutlinedTextField(
+                value = newEmail,
+                onValueChange = {
+                    newEmail = it
+                    newEmailError = null
+                },
+                label = { Text("New email address") },
+                isError = newEmailError != null,
+                supportingText = newEmailError?.let { { Text(it) } },
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth(),
+            )
+
+            Button(
+                onClick = {
+                    newEmailError = Validators.emailError(newEmail)
+                    if (newEmailError != null) return@Button
+                    if (currentPassword.isEmpty()) {
+                        scope.launch {
+                            snackbarHostState.showSnackbar("Enter your current password first")
+                        }
+                        return@Button
+                    }
+                    isBusy = true
+                    scope.launch {
+                        val result = authRepository.updateEmail(newEmail.trim(), currentPassword)
+                        isBusy = false
+                        snackbarHostState.showSnackbar(
+                            when (result) {
+                                // verifyBeforeUpdateEmail only takes effect once the new
+                                // address is confirmed, so say that rather than claiming
+                                // the change already happened.
+                                is Result.Success ->
+                                    "Check $newEmail to confirm the change"
+
+                                is Result.Failure -> result.message
+                            },
+                        )
+                    }
+                },
+                enabled = !isBusy,
+                modifier = Modifier.fillMaxWidth(),
+            ) { Text("Change email") }
+
+            OutlinedTextField(
+                value = newPassword,
+                onValueChange = {
+                    newPassword = it
+                    newPasswordError = null
+                },
+                label = { Text("New password") },
+                isError = newPasswordError != null,
+                supportingText = newPasswordError?.let { { Text(it) } },
+                visualTransformation = if (passwordVisible) {
+                    VisualTransformation.None
+                } else {
+                    PasswordVisualTransformation()
+                },
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth(),
+            )
+
+            Button(
+                onClick = {
+                    newPasswordError = Validators.passwordError(newPassword)
+                    if (newPasswordError != null) return@Button
+                    if (currentPassword.isEmpty()) {
+                        scope.launch {
+                            snackbarHostState.showSnackbar("Enter your current password first")
+                        }
+                        return@Button
+                    }
+                    isBusy = true
+                    scope.launch {
+                        val result = authRepository.updatePassword(newPassword, currentPassword)
+                        isBusy = false
+                        snackbarHostState.showSnackbar(
+                            when (result) {
+                                is Result.Success -> "Password changed"
+                                is Result.Failure -> result.message
+                            },
+                        )
+                        if (result is Result.Success) {
+                            newPassword = ""
+                            currentPassword = ""
+                        }
+                    }
+                },
+                enabled = !isBusy,
+                modifier = Modifier.fillMaxWidth(),
+            ) { Text("Change password") }
+
+            HorizontalDivider()
+
+            OutlinedButton(
+                onClick = {
+                    authRepository.signOut()
+                    navController.navigate(Routes.LOGIN) {
+                        popUpTo(navController.graph.id) { inclusive = true }
+                    }
+                },
+                modifier = Modifier.fillMaxWidth(),
+            ) { Text("Sign out") }
         }
     }
 }
