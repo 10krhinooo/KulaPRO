@@ -24,3 +24,7 @@ node_modules/
 firebase-debug.log
 firestore-debug.log
 ui-debug.log
+
+# Robolectric writes runtime jars here when user.home is unresolved
+${user.home}/
+**/${user.home}/

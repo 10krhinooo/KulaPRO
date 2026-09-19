@@ -2,27 +2,16 @@ package com.example.kulapro.pages
 
 import android.app.Activity
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Visibility
-import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material.icons.rounded.Email
 import androidx.compose.material.icons.rounded.Lock
-import androidx.compose.material3.Button
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
@@ -34,18 +23,22 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.text.input.PasswordVisualTransformation
-import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
 import com.example.kulapro.Routes
 import com.example.kulapro.data.repository.AuthRepository
 import com.example.kulapro.data.repository.AuthRepositoryFirebase
 import com.example.kulapro.data.repository.Result
+import com.example.kulapro.ui.components.AuthScaffold
+import com.example.kulapro.ui.components.KulaPasswordField
+import com.example.kulapro.ui.components.KulaTextField
+import com.example.kulapro.ui.components.PrimaryButton
+import com.example.kulapro.ui.components.SecondaryButton
+import com.example.kulapro.ui.components.shakeOnError
 import com.example.kulapro.util.Validators
 import kotlinx.coroutines.launch
 
@@ -53,7 +46,9 @@ import kotlinx.coroutines.launch
 fun LoginPage(
     navController: NavController,
     modifier: Modifier = Modifier,
-    authRepository: AuthRepository = remember { AuthRepositoryFirebase() },
+    onSignedIn: () -> Unit = { navController.navigate(Routes.HOME) },
+    appContext: android.content.Context = LocalContext.current.applicationContext,
+    authRepository: AuthRepository = remember { AuthRepositoryFirebase(appContext) },
 ) {
     val scope = rememberCoroutineScope()
     val snackbarHostState = remember { SnackbarHostState() }
@@ -63,163 +58,124 @@ fun LoginPage(
     var password by remember { mutableStateOf("") }
     var emailError by remember { mutableStateOf<String?>(null) }
     var passwordError by remember { mutableStateOf<String?>(null) }
-    var passwordVisible by remember { mutableStateOf(false) }
     var isSubmitting by remember { mutableStateOf(false) }
+    // Bumped on every failed submit so the shake replays even for the same error text.
+    var errorNonce by remember { mutableStateOf<Int?>(null) }
+
+    fun submit() {
+        emailError = Validators.emailError(email)
+        passwordError = Validators.signInPasswordError(password)
+        if (emailError != null || passwordError != null) {
+            errorNonce = (errorNonce ?: 0) + 1
+            return
+        }
+        isSubmitting = true
+        scope.launch {
+            val result = authRepository.signIn(email.trim(), password)
+            isSubmitting = false
+            when (result) {
+                is Result.Success -> onSignedIn()
+
+                is Result.Failure -> {
+                    errorNonce = (errorNonce ?: 0) + 1
+                    snackbarHostState.showSnackbar(result.message)
+                }
+            }
+        }
+    }
 
     Scaffold(
         modifier = modifier,
+        // Insets are owned by the navigation Scaffold; applying them again here would
+        // double count the navigation bar height.
+        contentWindowInsets = WindowInsets(0, 0, 0, 0),
         snackbarHost = { SnackbarHost(snackbarHostState) },
     ) { padding ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(padding)
-                .padding(24.dp)
-                .verticalScroll(rememberScrollState()),
-            verticalArrangement = Arrangement.Center,
-        ) {
-            Text(
-                text = "KulaPro",
-                style = MaterialTheme.typography.displaySmall,
-                fontWeight = FontWeight.Bold,
-            )
-            Text(
-                text = "Sign in to book your table",
-                style = MaterialTheme.typography.bodyLarge,
-            )
-
-            Spacer(Modifier.height(32.dp))
-
-            OutlinedTextField(
-                value = email,
-                onValueChange = {
-                    email = it
-                    emailError = null
-                },
-                label = { Text("Email") },
-                leadingIcon = { Icon(Icons.Rounded.Email, contentDescription = null) },
-                isError = emailError != null,
-                supportingText = emailError?.let { { Text(it) } },
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
-                singleLine = true,
-                shape = RoundedCornerShape(16.dp),
-                modifier = Modifier.fillMaxWidth(),
-            )
-
-            Spacer(Modifier.height(12.dp))
-
-            OutlinedTextField(
-                value = password,
-                onValueChange = {
-                    password = it
-                    passwordError = null
-                },
-                label = { Text("Password") },
-                leadingIcon = { Icon(Icons.Rounded.Lock, contentDescription = null) },
-                trailingIcon = {
-                    IconButton(onClick = { passwordVisible = !passwordVisible }) {
-                        Icon(
-                            imageVector = if (passwordVisible) {
-                                Icons.Filled.Visibility
-                            } else {
-                                Icons.Filled.VisibilityOff
-                            },
-                            contentDescription = if (passwordVisible) {
-                                "Hide password"
-                            } else {
-                                "Show password"
-                            },
-                        )
-                    }
-                },
-                visualTransformation = if (passwordVisible) {
-                    VisualTransformation.None
+        Box(Modifier.padding(padding)) {
+            AuthScaffold(
+                title = "Welcome back",
+                subtitle = "Sign in to book your table.",
+                onBack = if (navController.previousBackStackEntry != null) {
+                    { navController.popBackStack() }
                 } else {
-                    PasswordVisualTransformation()
+                    null
                 },
-                isError = passwordError != null,
-                supportingText = passwordError?.let { { Text(it) } },
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
-                singleLine = true,
-                shape = RoundedCornerShape(16.dp),
-                modifier = Modifier.fillMaxWidth(),
-            )
-
-            Spacer(Modifier.height(24.dp))
-
-            Button(
-                onClick = {
-                    emailError = Validators.emailError(email)
-                    passwordError = Validators.signInPasswordError(password)
-                    if (emailError != null || passwordError != null) return@Button
-
-                    isSubmitting = true
-                    scope.launch {
-                        val result = authRepository.signIn(email.trim(), password)
-                        isSubmitting = false
-                        when (result) {
-                            is Result.Success -> navController.navigate(Routes.HOME) {
-                                // Clear the auth screens so Back does not return to login.
-                                popUpTo(Routes.LOGIN) { inclusive = true }
-                            }
-
-                            is Result.Failure -> snackbarHostState.showSnackbar(result.message)
-                        }
-                    }
-                },
-                enabled = !isSubmitting,
-                modifier = Modifier.fillMaxWidth(),
             ) {
-                Text(
-                    text = if (isSubmitting) "Signing in..." else "Sign in",
-                    fontWeight = FontWeight.Bold,
-                    modifier = Modifier.padding(vertical = 4.dp),
+                KulaTextField(
+                    value = email,
+                    onValueChange = {
+                        email = it
+                        emailError = null
+                    },
+                    label = "Email",
+                    leadingIcon = Icons.Rounded.Email,
+                    error = emailError,
+                    keyboardType = KeyboardType.Email,
+                    enabled = !isSubmitting,
+                    modifier = Modifier.shakeOnError(errorNonce?.takeIf { emailError != null }),
                 )
-            }
 
+                KulaPasswordField(
+                    value = password,
+                    onValueChange = {
+                        password = it
+                        passwordError = null
+                    },
+                    label = "Password",
+                    error = passwordError,
+                    enabled = !isSubmitting,
+                    modifier = Modifier.shakeOnError(errorNonce?.takeIf { passwordError != null }),
+                )
 
-            Spacer(Modifier.height(16.dp))
+                PrimaryButton(
+                    text = "Sign in",
+                    loadingText = "Signing in",
+                    loading = isSubmitting,
+                    onClick = ::submit,
+                )
 
-            GoogleSignInButton(
-                enabled = !isSubmitting,
-                onClick = {
-                    val activity = context as? Activity
-                    if (activity == null) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    HorizontalDivider(modifier = Modifier.weight(1f))
+                    Text(
+                        text = "or",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    HorizontalDivider(modifier = Modifier.weight(1f))
+                }
+
+                GoogleSignInButton(
+                    enabled = !isSubmitting,
+                    onClick = {
+                        val activity = context as? Activity ?: return@GoogleSignInButton
+                        isSubmitting = true
                         scope.launch {
-                            snackbarHostState.showSnackbar("Google sign-in is unavailable here")
-                        }
-                        return@GoogleSignInButton
-                    }
-                    isSubmitting = true
-                    scope.launch {
-                        val result = authRepository.signInWithGoogle(activity)
-                        isSubmitting = false
-                        when (result) {
-                            is Result.Success -> navController.navigate(Routes.HOME) {
-                                popUpTo(Routes.LOGIN) { inclusive = true }
+                            val result = authRepository.signInWithGoogle(activity)
+                            isSubmitting = false
+                            when (result) {
+                                is Result.Success -> onSignedIn()
+
+                                is Result.Failure ->
+                                    snackbarHostState.showSnackbar(result.message)
                             }
-
-                            is Result.Failure -> snackbarHostState.showSnackbar(result.message)
                         }
-                    }
-                },
-            )
-            Spacer(Modifier.height(8.dp))
+                    },
+                )
 
-            TextButton(
-                onClick = { navController.navigate(Routes.FORGOT) },
-                modifier = Modifier.fillMaxWidth(),
-            ) {
-                Text("Forgot your password?")
-            }
+                TextButton(
+                    onClick = { navController.navigate(Routes.FORGOT) },
+                    modifier = Modifier.fillMaxWidth(),
+                ) { Text("Forgot your password?") }
 
-            Spacer(Modifier.height(8.dp))
-
-            OutlinedButton(
-                onClick = { navController.navigate(Routes.REGISTER) },
-                modifier = Modifier.fillMaxWidth(),
-            ) {
-                Text("Create an account", modifier = Modifier.padding(vertical = 4.dp))
+                SecondaryButton(
+                    text = "Create an account",
+                    onClick = { navController.navigate(Routes.REGISTER) },
+                    enabled = !isSubmitting,
+                )
             }
         }
     }

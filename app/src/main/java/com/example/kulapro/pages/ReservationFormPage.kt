@@ -2,6 +2,7 @@ package com.example.kulapro.pages
 
 import android.app.DatePickerDialog
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
@@ -130,6 +131,9 @@ fun ReservationFormScreen(
 
     Scaffold(
         modifier = modifier,
+        // Insets are owned by the navigation Scaffold; applying them again here would
+        // double count the navigation bar height.
+        contentWindowInsets = WindowInsets(0, 0, 0, 0),
         topBar = { TopAppBar(title = { Text(restaurantName.ifBlank { "Book a table" }) }) },
         snackbarHost = { SnackbarHost(snackbarHostState) },
     ) { padding ->

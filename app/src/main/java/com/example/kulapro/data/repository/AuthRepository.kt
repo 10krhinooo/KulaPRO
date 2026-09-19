@@ -1,7 +1,6 @@
 package com.example.kulapro.data.repository
 
 import android.content.Context
-import com.example.kulapro.data.model.UserProfile
 import kotlinx.coroutines.flow.Flow
 
 interface AuthRepository {
@@ -38,7 +37,14 @@ interface AuthRepository {
 
     suspend fun updatePassword(newPassword: String, currentPassword: String): Result<Unit>
 
-    suspend fun profile(): Result<UserProfile>
+    /**
+     * Restaurants this user may manage, read from their Firebase Auth custom claims.
+     *
+     * Claims are signed by Firebase and cannot be edited by the client, unlike the role
+     * field on the profile document, which its owner can write. Anything that grants
+     * privilege must read from here.
+     */
+    suspend fun managedRestaurantIds(forceRefresh: Boolean = false): Result<List<String>>
 
     fun signOut()
 }

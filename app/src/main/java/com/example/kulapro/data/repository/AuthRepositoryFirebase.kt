@@ -1,27 +1,31 @@
 package com.example.kulapro.data.repository
 
 import android.content.Context
+import android.net.Uri
 import androidx.credentials.CredentialManager
 import androidx.credentials.GetCredentialRequest
 import androidx.credentials.exceptions.GetCredentialCancellationException
 import androidx.credentials.exceptions.NoCredentialException
 import com.example.kulapro.R
 import com.example.kulapro.data.model.UserProfile
+import com.example.kulapro.util.ImageDownscaler
 import com.google.android.libraries.identity.googleid.GetGoogleIdOption
 import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential
 import com.google.firebase.auth.GoogleAuthProvider
 import com.google.firebase.auth.EmailAuthProvider
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.SetOptions
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.tasks.await
 
 class AuthRepositoryFirebase(
+    private val context: Context,
     private val auth: FirebaseAuth = FirebaseAuth.getInstance(),
     private val firestore: FirebaseFirestore = FirebaseFirestore.getInstance(),
-) : AuthRepository {
+) : AuthRepository, ProfileRepository {
 
     override val currentUserId: String? get() = auth.currentUser?.uid
 
@@ -84,8 +88,9 @@ class AuthRepositoryFirebase(
                 mapOf(
                     "email" to user.email.orEmpty(),
                     "displayName" to (googleCredential.displayName ?: user.displayName.orEmpty()),
+                    "photoUrl" to (googleCredential.profilePictureUri?.toString() ?: ""),
                 ),
-                com.google.firebase.firestore.SetOptions.merge(),
+                SetOptions.merge(),
             )
             .await()
 
@@ -140,6 +145,79 @@ class AuthRepositoryFirebase(
         }
     }
 
+    override fun profileFlow(): Flow<UserProfile?> = callbackFlow {
+        val uid = currentUserId
+        if (uid == null) {
+            trySend(null)
+            awaitClose { }
+            return@callbackFlow
+        }
+        val registration = firestore.collection(FirestorePaths.USERS)
+            .document(uid)
+            .addSnapshotListener { snapshot, error ->
+                if (error != null) {
+                    close(error)
+                    return@addSnapshotListener
+                }
+                trySend(snapshot?.toObject(UserProfile::class.java))
+            }
+        awaitClose { registration.remove() }
+    }
+
+    override suspend fun updateProfileDetails(
+        displayName: String,
+        phone: String,
+    ): Result<Unit> {
+        val uid = currentUserId ?: return Result.Failure("Not signed in")
+        return runCatchingAuth {
+            firestore.collection(FirestorePaths.USERS)
+                .document(uid)
+                .set(
+                    mapOf("displayName" to displayName, "phone" to phone),
+                    SetOptions.merge(),
+                )
+                .await()
+        }
+    }
+
+    override suspend fun updateProfilePhoto(imageUri: Uri): Result<String> {
+        val uid = currentUserId ?: return Result.Failure("Not signed in")
+        val dataUri = ImageDownscaler.toDataUri {
+            context.contentResolver.openInputStream(imageUri)
+        }
+            ?: return Result.Failure("That image could not be read")
+        return runCatchingAuth {
+            firestore.collection(FirestorePaths.USERS)
+                .document(uid)
+                .set(mapOf("photoUrl" to dataUri), SetOptions.merge())
+                .await()
+            dataUri
+        }
+    }
+
+    override suspend fun removeProfilePhoto(): Result<Unit> {
+        val uid = currentUserId ?: return Result.Failure("Not signed in")
+        return runCatchingAuth {
+            firestore.collection(FirestorePaths.USERS)
+                .document(uid)
+                .set(mapOf("photoUrl" to ""), SetOptions.merge())
+                .await()
+        }
+    }
+
+    override suspend fun managedRestaurantIds(forceRefresh: Boolean): Result<List<String>> {
+        val user = auth.currentUser ?: return Result.Success(emptyList())
+        return runCatchingAuth {
+            val token = user.getIdToken(forceRefresh).await()
+            val claim = token.claims[CLAIM_MANAGED_RESTAURANTS]
+            when (claim) {
+                is List<*> -> claim.filterIsInstance<String>()
+                is String -> listOf(claim)
+                else -> emptyList()
+            }
+        }
+    }
+
     override fun signOut() = auth.signOut()
 }
 
@@ -148,3 +226,5 @@ private inline fun <T> runCatchingAuth(block: () -> T): Result<T> = try {
 } catch (e: Exception) {
     Result.Failure(e.message ?: "Something went wrong", e)
 }
+
+private const val CLAIM_MANAGED_RESTAURANTS = "managedRestaurants"

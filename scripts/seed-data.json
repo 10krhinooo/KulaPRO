@@ -1,0 +1,142 @@
+[
+  {
+    "id": "the-bistro",
+    "name": "The Bistro",
+    "description": "Neighbourhood European cooking, long lunches, short menu.",
+    "cuisine": "European",
+    "priceBand": 3,
+    "address": "Westlands, Nairobi",
+    "phone": "+254700000001",
+    "location": [
+      -1.2649,
+      36.8038
+    ],
+    "capacityPerSlot": 24,
+    "slotDurationMinutes": 90,
+    "menu": [
+      {
+        "name": "Steak frites",
+        "description": "Sirloin, peppercorn sauce, thin fries",
+        "priceCents": 185000,
+        "category": "Mains"
+      },
+      {
+        "name": "French onion soup",
+        "description": "Slow onions, gruyere crouton",
+        "priceCents": 75000,
+        "category": "Starters"
+      },
+      {
+        "name": "Creme brulee",
+        "description": "Vanilla custard, burnt sugar",
+        "priceCents": 65000,
+        "category": "Desserts"
+      }
+    ]
+  },
+  {
+    "id": "sushi-den",
+    "name": "Sushi Den",
+    "description": "Counter seating, daily fish, omakase on request.",
+    "cuisine": "Japanese",
+    "priceBand": 4,
+    "address": "Kilimani, Nairobi",
+    "phone": "+254700000002",
+    "location": [
+      -1.2921,
+      36.7856
+    ],
+    "capacityPerSlot": 16,
+    "slotDurationMinutes": 120,
+    "menu": [
+      {
+        "name": "Omakase set",
+        "description": "Twelve pieces, chef's choice",
+        "priceCents": 420000,
+        "category": "Sets"
+      },
+      {
+        "name": "Salmon nigiri",
+        "description": "Two pieces",
+        "priceCents": 60000,
+        "category": "Nigiri"
+      },
+      {
+        "name": "Miso soup",
+        "description": "White miso, tofu, spring onion",
+        "priceCents": 35000,
+        "category": "Sides"
+      }
+    ]
+  },
+  {
+    "id": "the-grill",
+    "name": "The Grill",
+    "description": "Open fire, big plates, built for sharing.",
+    "cuisine": "Grill",
+    "priceBand": 2,
+    "address": "Karen, Nairobi",
+    "phone": "+254700000003",
+    "location": [
+      -1.3194,
+      36.7073
+    ],
+    "capacityPerSlot": 40,
+    "slotDurationMinutes": 90,
+    "menu": [
+      {
+        "name": "Nyama choma platter",
+        "description": "Goat, beef, kachumbari, ugali",
+        "priceCents": 165000,
+        "category": "Mains"
+      },
+      {
+        "name": "Grilled tilapia",
+        "description": "Whole fish, lemon, chilli",
+        "priceCents": 140000,
+        "category": "Mains"
+      },
+      {
+        "name": "Chapati",
+        "description": "Two pieces",
+        "priceCents": 20000,
+        "category": "Sides"
+      }
+    ]
+  },
+  {
+    "id": "forno-pizza",
+    "name": "Forno",
+    "description": "Wood-fired Neapolitan pizza, sixty second bake.",
+    "cuisine": "Italian",
+    "priceBand": 2,
+    "address": "Lavington, Nairobi",
+    "phone": "+254700000004",
+    "location": [
+      -1.2785,
+      36.7669
+    ],
+    "capacityPerSlot": 32,
+    "slotDurationMinutes": 60,
+    "menu": [
+      {
+        "name": "Margherita",
+        "description": "San Marzano, fior di latte, basil",
+        "priceCents": 95000,
+        "category": "Pizza"
+      },
+      {
+        "name": "Diavola",
+        "description": "Spicy salami, chilli honey",
+        "priceCents": 115000,
+        "category": "Pizza"
+      },
+      {
+        "name": "Tiramisu",
+        "description": "Espresso, mascarpone",
+        "priceCents": 55000,
+        "category": "Desserts"
+      }
+    ]
+  }
+]

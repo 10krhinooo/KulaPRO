@@ -1,6 +1,7 @@
 package com.example.kulapro.pages
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
@@ -8,6 +9,10 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.outlined.EventNote
 import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -32,9 +37,18 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.example.kulapro.data.model.Reservation
 import com.example.kulapro.data.model.ReservationStatus
+import com.example.kulapro.data.model.Review
 import com.example.kulapro.data.repository.ReservationRepository
 import com.example.kulapro.data.repository.ReservationRepositoryFirestore
+import com.example.kulapro.data.repository.ReviewRepository
+import com.example.kulapro.data.repository.ReviewRepositoryFirestore
 import com.example.kulapro.data.repository.Result
+import com.example.kulapro.ui.components.AnimatedListItem
+import com.example.kulapro.ui.components.EmptyState
+import com.example.kulapro.ui.components.RestaurantCardSkeleton
+import com.example.kulapro.ui.components.ReviewDialog
+import com.example.kulapro.ui.components.SignInPrompt
+import com.example.kulapro.ui.components.StatusBadge
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Locale
@@ -48,12 +62,17 @@ import java.util.Locale
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ReservationScreen(
+    onSignIn: () -> Unit,
+    isSignedIn: Boolean,
     modifier: Modifier = Modifier,
     repository: ReservationRepository = remember { ReservationRepositoryFirestore() },
+    reviewRepository: ReviewRepository = remember { ReviewRepositoryFirestore() },
 ) {
     val scope = rememberCoroutineScope()
     val snackbarHostState = remember { SnackbarHostState() }
     var isLoading by remember { mutableStateOf(true) }
+    var reviewTarget by remember { mutableStateOf<Reservation?>(null) }
+    var isPostingReview by remember { mutableStateOf(false) }
 
     val reservations by produceState(initialValue = emptyList<Reservation>(), repository) {
         repository.myReservations().collect {
@@ -62,8 +81,40 @@ fun ReservationScreen(
         }
     }
 
+    reviewTarget?.let { target ->
+        ReviewDialog(
+            restaurantName = target.restaurantName.ifBlank { "this restaurant" },
+            submitting = isPostingReview,
+            onDismiss = { reviewTarget = null },
+            onSubmit = { rating, comment ->
+                isPostingReview = true
+                scope.launch {
+                    val result = reviewRepository.submit(
+                        Review(
+                            restaurantId = target.restaurantId,
+                            reservationId = target.id,
+                            rating = rating,
+                            comment = comment,
+                        ),
+                    )
+                    isPostingReview = false
+                    reviewTarget = null
+                    snackbarHostState.showSnackbar(
+                        when (result) {
+                            is Result.Success -> "Thanks, your review is live"
+                            is Result.Failure -> result.message
+                        },
+                    )
+                }
+            },
+        )
+    }
+
     Scaffold(
         modifier = modifier,
+        // Insets are owned by the navigation Scaffold; applying them again here would
+        // double count the navigation bar height.
+        contentWindowInsets = WindowInsets(0, 0, 0, 0),
         topBar = { TopAppBar(title = { Text("Your reservations") }) },
         snackbarHost = { SnackbarHost(snackbarHostState) },
     ) { padding ->
@@ -74,16 +125,36 @@ fun ReservationScreen(
             contentAlignment = Alignment.Center,
         ) {
             when {
-                isLoading -> CircularProgressIndicator()
+                !isSignedIn -> SignInPrompt(
+                    title = "Sign in to see your bookings",
+                    description = "Your reservations are tied to your account. " +
+                        "Browsing restaurants does not need one.",
+                    onSignIn = onSignIn,
+                )
 
-                reservations.isEmpty() -> EmptyReservations()
+                isLoading -> LazyColumn(
+                    contentPadding = PaddingValues(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    items(PLACEHOLDER_COUNT) { RestaurantCardSkeleton() }
+                }
+
+                reservations.isEmpty() -> EmptyState(
+                    title = "No reservations yet",
+                    description = "When you book a table it will show up here.",
+                    icon = Icons.AutoMirrored.Outlined.EventNote,
+                )
 
                 else -> LazyColumn(
                     modifier = Modifier.fillMaxSize(),
                     contentPadding = androidx.compose.foundation.layout.PaddingValues(16.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
-                    items(reservations, key = { it.id }) { reservation ->
+                    itemsIndexed(
+                        items = reservations,
+                        key = { _, reservation -> reservation.id },
+                    ) { index, reservation ->
+                        AnimatedListItem(index = index) {
                         ReservationItem(
                             reservation = reservation,
                             onCancel = {
@@ -97,7 +168,9 @@ fun ReservationScreen(
                                     }
                                 }
                             },
+                            onReview = { reviewTarget = reservation },
                         )
+                        }
                     }
                 }
             }
@@ -106,22 +179,11 @@ fun ReservationScreen(
 }
 
 @Composable
-private fun EmptyReservations() {
-    Column(
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(8.dp),
-        modifier = Modifier.padding(32.dp),
-    ) {
-        Text("No reservations yet", style = MaterialTheme.typography.titleMedium)
-        Text(
-            "When you book a table it will show up here.",
-            style = MaterialTheme.typography.bodyMedium,
-        )
-    }
-}
-
-@Composable
-private fun ReservationItem(reservation: Reservation, onCancel: () -> Unit) {
+private fun ReservationItem(
+    reservation: Reservation,
+    onCancel: () -> Unit,
+    onReview: () -> Unit,
+) {
     val formatter = remember { SimpleDateFormat("EEE d MMM yyyy 'at' h:mm a", Locale.getDefault()) }
     val status = reservation.statusEnum
 
@@ -144,16 +206,23 @@ private fun ReservationItem(reservation: Reservation, onCancel: () -> Unit) {
                     if (reservation.partySize == 1) "guest" else "guests",
                 style = MaterialTheme.typography.bodyMedium,
             )
-            Text(
-                text = status.name.lowercase().replaceFirstChar { it.uppercase() }
-                    .replace('_', ' '),
-                style = MaterialTheme.typography.labelLarge,
-            )
+            StatusBadge(status = status, modifier = Modifier.padding(top = 4.dp))
 
-            if (status.occupiesCapacity) {
-                HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
-                TextButton(onClick = onCancel) { Text("Cancel booking") }
+            when {
+                status.occupiesCapacity -> {
+                    HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
+                    TextButton(onClick = onCancel) { Text("Cancel booking") }
+                }
+
+                // Only a completed visit can be reviewed, which mirrors what the security
+                // rules will accept, so the button never leads to a rejected write.
+                status == ReservationStatus.COMPLETED -> {
+                    HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
+                    TextButton(onClick = onReview) { Text("Leave a review") }
+                }
             }
         }
     }
 }
+
+private const val PLACEHOLDER_COUNT = 3

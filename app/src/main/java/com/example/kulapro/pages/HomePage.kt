@@ -1,59 +1,58 @@
 package com.example.kulapro.pages
 
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Restaurant
 import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.Settings
-import androidx.compose.material.icons.rounded.Star
-import androidx.compose.material3.Card
-import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
-import coil.compose.AsyncImage
 import com.example.kulapro.Routes
 import com.example.kulapro.data.model.Restaurant
+import com.example.kulapro.feature.owner.Portal
+import com.example.kulapro.feature.owner.PortalSwitcher
 import com.example.kulapro.data.repository.RestaurantRepository
 import com.example.kulapro.data.repository.RestaurantRepositoryFirestore
+import com.example.kulapro.ui.components.AnimatedListItem
+import com.example.kulapro.ui.components.EmptyState
+import com.example.kulapro.ui.components.RestaurantCard
+import com.example.kulapro.ui.components.RestaurantCardSkeleton
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomePage(
     navController: NavController,
+    onBook: (restaurantId: String, restaurantName: String) -> Unit,
+    onSwitchToHosting: (String) -> Unit,
     modifier: Modifier = Modifier,
+    managedRestaurantId: String? = null,
     repository: RestaurantRepository = remember { RestaurantRepositoryFirestore() },
 ) {
     var isLoading by remember { mutableStateOf(true) }
 
-    // Restaurants come from Firestore. The first version hardcoded four drawables, so the
-    // list could never change without shipping a new APK.
     val restaurants by produceState(initialValue = emptyList<Restaurant>(), repository) {
         repository.restaurants().collect {
             value = it
@@ -63,10 +62,26 @@ fun HomePage(
 
     Scaffold(
         modifier = modifier,
+        // Insets are owned by the navigation Scaffold; applying them again here would
+        // double count the navigation bar height.
+        contentWindowInsets = WindowInsets(0, 0, 0, 0),
         topBar = {
-            TopAppBar(
-                title = { Text("Find a table") },
+            CenterAlignedTopAppBar(
+                title = { Text("KulaPro", style = MaterialTheme.typography.titleLarge) },
+                colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.surface,
+                    titleContentColor = MaterialTheme.colorScheme.primary,
+                ),
                 actions = {
+                    // Only rendered when the user's claims name a restaurant, so the control
+                    // never promises access the rules would refuse.
+                    managedRestaurantId?.let { id ->
+                        PortalSwitcher(
+                            current = Portal.CUSTOMER,
+                            onSwitch = { onSwitchToHosting(id) },
+                            modifier = Modifier.padding(end = 4.dp),
+                        )
+                    }
                     IconButton(onClick = { navController.navigate(Routes.SETTINGS) }) {
                         Icon(Icons.Rounded.Settings, contentDescription = "Settings")
                     }
@@ -77,41 +92,50 @@ fun HomePage(
             )
         },
     ) { padding ->
-        Box(
+        Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding),
-            contentAlignment = Alignment.Center,
         ) {
-            when {
-                isLoading -> CircularProgressIndicator()
+            Text(
+                text = "Where are you eating?",
+                style = MaterialTheme.typography.headlineMedium,
+                modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 8.dp),
+            )
+            Text(
+                text = "Real tables, real times, booked in seconds.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(start = 16.dp, end = 16.dp, bottom = 8.dp),
+            )
 
-                restaurants.isEmpty() -> Column(
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
-                    modifier = Modifier.padding(32.dp),
+            when {
+                // Skeletons matching the real card, so the layout does not jump on load.
+                isLoading -> LazyColumn(
+                    contentPadding = PaddingValues(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(16.dp),
                 ) {
-                    Text("No restaurants yet", style = MaterialTheme.typography.titleMedium)
-                    Text(
-                        "Once restaurants are added they will appear here.",
-                        style = MaterialTheme.typography.bodyMedium,
-                    )
+                    items(PLACEHOLDER_COUNT) { RestaurantCardSkeleton() }
                 }
+
+                restaurants.isEmpty() -> EmptyState(
+                    title = "No restaurants yet",
+                    description = "Once restaurants join KulaPro they will show up here.",
+                    icon = Icons.Outlined.Restaurant,
+                )
 
                 else -> LazyColumn(
                     modifier = Modifier.fillMaxSize(),
                     contentPadding = PaddingValues(16.dp),
                     verticalArrangement = Arrangement.spacedBy(16.dp),
                 ) {
-                    items(restaurants, key = { it.id }) { restaurant ->
-                        RestaurantCard(
-                            restaurant = restaurant,
-                            onClick = {
-                                navController.navigate(
-                                    Routes.reservationForm(restaurant.id, restaurant.name),
-                                )
-                            },
-                        )
+                    itemsIndexed(restaurants) { index, restaurant ->
+                        AnimatedListItem(index = index) {
+                            RestaurantCard(
+                                restaurant = restaurant,
+                                onClick = { onBook(restaurant.id, restaurant.name) },
+                            )
+                        }
                     }
                 }
             }
@@ -119,60 +143,4 @@ fun HomePage(
     }
 }
 
-@Composable
-private fun RestaurantCard(restaurant: Restaurant, onClick: () -> Unit) {
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(onClick = onClick),
-    ) {
-        Column {
-            AsyncImage(
-                model = restaurant.imageUrl,
-                contentDescription = restaurant.name,
-                contentScale = ContentScale.Crop,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(160.dp),
-            )
-            Column(
-                modifier = Modifier.padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(4.dp),
-            ) {
-                Text(
-                    text = restaurant.name,
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                )
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    if (restaurant.reviewCount > 0) {
-                        Icon(
-                            Icons.Rounded.Star,
-                            contentDescription = null,
-                            modifier = Modifier.height(16.dp),
-                        )
-                        Text(
-                            text = "%.1f (${restaurant.reviewCount})".format(
-                                restaurant.averageRating,
-                            ),
-                            style = MaterialTheme.typography.bodySmall,
-                        )
-                    }
-                    if (restaurant.cuisine.isNotBlank()) {
-                        Text(
-                            text = restaurant.cuisine,
-                            style = MaterialTheme.typography.bodySmall,
-                        )
-                    }
-                    Text(
-                        text = "$".repeat(restaurant.priceBand.coerceIn(1, 4)),
-                        style = MaterialTheme.typography.bodySmall,
-                    )
-                }
-            }
-        }
-    }
-}
+private const val PLACEHOLDER_COUNT = 3

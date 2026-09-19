@@ -15,6 +15,7 @@ data class UserProfile(
     val email: String = "",
     val displayName: String = "",
     val phone: String = "",
+    val photoUrl: String = "",
     val favouriteRestaurantIds: List<String> = emptyList(),
     val role: String = UserRole.DINER.name,
     val createdAt: Timestamp = Timestamp.now(),

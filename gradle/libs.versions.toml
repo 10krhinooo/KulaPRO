@@ -72,7 +72,6 @@ androidx-hilt-navigation-compose = { group = "androidx.hilt", name = "hilt-navig
 firebase-bom = { group = "com.google.firebase", name = "firebase-bom", version.ref = "firebaseBom" }
 firebase-auth = { group = "com.google.firebase", name = "firebase-auth-ktx" }
 firebase-firestore = { group = "com.google.firebase", name = "firebase-firestore-ktx" }
-firebase-storage = { group = "com.google.firebase", name = "firebase-storage-ktx" }
 firebase-functions = { group = "com.google.firebase", name = "firebase-functions-ktx" }
 
 # Google Sign-In via Credential Manager (replaces the deprecated GoogleSignInClient API)

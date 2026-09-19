@@ -2,6 +2,7 @@ package com.example.kulapro.pages
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -39,6 +40,9 @@ fun SettingsScreen(
 
     Scaffold(
         modifier = modifier,
+        // Insets are owned by the navigation Scaffold; applying them again here would
+        // double count the navigation bar height.
+        contentWindowInsets = WindowInsets(0, 0, 0, 0),
         topBar = { TopAppBar(title = { Text("Settings") }) },
     ) { padding ->
         Column(
