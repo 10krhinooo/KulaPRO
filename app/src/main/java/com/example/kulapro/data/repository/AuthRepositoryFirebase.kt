@@ -11,11 +11,12 @@ import com.example.kulapro.data.model.UserProfile
 import com.example.kulapro.util.ImageDownscaler
 import com.google.android.libraries.identity.googleid.GetGoogleIdOption
 import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential
-import com.google.firebase.auth.GoogleAuthProvider
 import com.google.firebase.auth.EmailAuthProvider
 import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.auth.GoogleAuthProvider
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.SetOptions
+import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
@@ -95,6 +96,10 @@ class AuthRepositoryFirebase(
             .await()
 
         Result.Success(Unit)
+    } catch (e: CancellationException) {
+        // The coroutine was cancelled, not the sign-in. Reporting it would show an error for
+        // a screen the user has already left.
+        throw e
     } catch (e: GetCredentialCancellationException) {
         Result.Failure("Sign-in cancelled", e)
     } catch (e: NoCredentialException) {
@@ -221,8 +226,17 @@ class AuthRepositoryFirebase(
     override fun signOut() = auth.signOut()
 }
 
+/**
+ * Runs an auth call and reports failure rather than throwing.
+ *
+ * Cancellation is rethrown, not reported. [CancellationException] is an [Exception], so
+ * catching it would turn a screen being navigated away from into a visible error, and would
+ * break structured concurrency by letting a cancelled coroutine continue.
+ */
 private inline fun <T> runCatchingAuth(block: () -> T): Result<T> = try {
     Result.Success(block())
+} catch (e: CancellationException) {
+    throw e
 } catch (e: Exception) {
     Result.Failure(e.message ?: "Something went wrong", e)
 }

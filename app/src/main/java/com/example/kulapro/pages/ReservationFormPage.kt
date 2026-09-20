@@ -665,7 +665,7 @@ private const val MAX_PARTY_SIZE = 12
 /** Below this many seats the slot is called out as nearly gone. */
 private const val SCARCE_SEATS = 4
 private const val SKELETON_SLOTS = 8
-private const val CONFIRMATION_MILLIS = 1_600L
+private const val CONFIRMATION_MILLIS = 2_400L
 private const val FULLY_ROUNDED = 50
 private val DAY_CHIP_WIDTH = 64.dp
 private val SLOT_SKELETON_WIDTH = 84.dp

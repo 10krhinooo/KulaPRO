@@ -7,6 +7,7 @@ import com.google.firebase.Timestamp
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.Query
+import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
@@ -132,8 +133,19 @@ class ReservationRepositoryFirestore(
             .document(startsAtSeconds.toString())
 }
 
+/**
+ * Runs a Firestore call and reports failure rather than throwing.
+ *
+ * [CancellationException] is rethrown rather than reported. It is an [Exception], so
+ * catching it here turned every cancelled read into a failure: changing the booking date
+ * twice in quick succession cancelled the first query and showed the user an error about a
+ * coroutine leaving the composition. Swallowing it also breaks structured concurrency,
+ * because a cancelled coroutine would carry on as though nothing had happened.
+ */
 internal inline fun <T> runCatchingFirestore(block: () -> T): Result<T> = try {
     Result.Success(block())
+} catch (e: CancellationException) {
+    throw e
 } catch (e: Exception) {
     Result.Failure(e.message ?: "Could not reach the server", e)
 }

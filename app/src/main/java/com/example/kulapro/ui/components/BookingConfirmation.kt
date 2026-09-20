@@ -5,7 +5,14 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
@@ -15,8 +22,6 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.PathMeasure
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.example.kulapro.ui.theme.LocalReduceMotion
@@ -50,39 +55,68 @@ fun BookingConfirmation(
         }
     }
 
-    Column(
-        modifier = modifier,
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(16.dp),
+    // A full screen surface of its own. Rendered as a bare column it sat unstyled in the
+    // top corner of whatever was behind it, with the previous screen showing through.
+    Surface(
+        modifier = modifier.fillMaxSize(),
+        color = MaterialTheme.colorScheme.background,
     ) {
-        Canvas(modifier = Modifier.size(96.dp)) {
-            val tick = Path().apply {
-                moveTo(size.width * TICK_START_X, size.height * TICK_START_Y)
-                lineTo(size.width * TICK_ELBOW_X, size.height * TICK_ELBOW_Y)
-                lineTo(size.width * TICK_END_X, size.height * TICK_END_Y)
-            }
-            val measure = PathMeasure().apply { setPath(tick, false) }
-            val drawn = Path()
-            measure.getSegment(0f, measure.length * progress.value, drawn, true)
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(32.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center,
+        ) {
+            Canvas(modifier = Modifier.size(96.dp)) {
+                val tick = Path().apply {
+                    moveTo(size.width * TICK_START_X, size.height * TICK_START_Y)
+                    lineTo(size.width * TICK_ELBOW_X, size.height * TICK_ELBOW_Y)
+                    lineTo(size.width * TICK_END_X, size.height * TICK_END_Y)
+                }
+                val measure = PathMeasure().apply { setPath(tick, false) }
+                val drawn = Path()
+                measure.getSegment(0f, measure.length * progress.value, drawn, true)
 
-            drawPath(
-                path = drawn,
-                color = tickColour,
-                style = Stroke(width = TICK_STROKE_WIDTH, cap = StrokeCap.Round),
+                drawPath(
+                    path = drawn,
+                    color = tickColour,
+                    style = Stroke(width = TICK_STROKE_WIDTH, cap = StrokeCap.Round),
+                )
+            }
+
+            Spacer(Modifier.height(24.dp))
+
+            Text(
+                text = "Table booked",
+                style = MaterialTheme.typography.headlineMedium,
+                textAlign = TextAlign.Center,
+            )
+
+            Spacer(Modifier.height(8.dp))
+
+            Text(
+                text = restaurantName,
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.primary,
+                textAlign = TextAlign.Center,
+            )
+            Text(
+                text = whenLabel,
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center,
+            )
+
+            Spacer(Modifier.height(16.dp))
+
+            Text(
+                text = "We have sent it to your reservations.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center,
             )
         }
-
-        Text(
-            text = "Table booked",
-            style = MaterialTheme.typography.headlineSmall,
-            textAlign = TextAlign.Center,
-        )
-        Text(
-            text = "$restaurantName, $whenLabel",
-            style = MaterialTheme.typography.bodyLarge,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            textAlign = TextAlign.Center,
-        )
     }
 }
 
