@@ -1,0 +1,29 @@
+name = "kulapro-scanner"
+main = "src/index.ts"
+compatibility_date = "2026-09-01"
+compatibility_flags = ["nodejs_compat"]
+
+# The cache of results and the per user daily counters. Both are small and both are
+# throwaway: losing this namespace costs money on the next scan of each dish, nothing more.
+#
+# Create it once and paste the id here:
+#   npx wrangler kv namespace create SCANNER
+[[kv_namespaces]]
+binding = "SCANNER"
+id = "replace-me-with-the-id-wrangler-prints"
+
+[vars]
+# The Firebase project whose ID tokens this worker will accept. A token minted for any
+# other project is rejected, which is what stops someone else's Firebase app calling this.
+FIREBASE_PROJECT_ID = "kulapro-61969"
+
+# Opus reads a plate more accurately; Haiku is roughly a fifth of the price. Swapping this
+# is a config change, not a code change, so the trade can be made against real results.
+ANTHROPIC_MODEL = "claude-opus-5"
+
+# Scans per user per day. The ceiling exists so a bug in the client, or one determined
+# user, cannot run up an unbounded bill.
+DAILY_SCAN_LIMIT = "25"
+
+# ANTHROPIC_API_KEY is a secret, never a var:
+#   npx wrangler secret put ANTHROPIC_API_KEY
