@@ -84,6 +84,7 @@ fun RestaurantDetailScreen(
     onBack: () -> Unit,
     onBook: (restaurantId: String, restaurantName: String) -> Unit,
     onReview: () -> Unit,
+    onClaim: (restaurantId: String, restaurantName: String) -> Unit,
     modifier: Modifier = Modifier,
     isSignedIn: Boolean = false,
     restaurantRepository: RestaurantRepository = remember { RestaurantRepositoryFirestore() },
@@ -239,6 +240,25 @@ fun RestaurantDetailScreen(
 
             items(reviews, key = { it.id }) { review ->
                 ReviewRow(review = review, modifier = Modifier.padding(horizontal = 16.dp))
+            }
+
+            // Only offered on a listing nobody manages yet. Showing it on a restaurant that
+            // already has an owner would invite a request that can only be declined.
+            if (loaded.ownerUserId.isBlank()) {
+                item {
+                    Section(title = "Is this your restaurant?") {
+                        Text(
+                            text = "Tell us and we will put you in charge of the listing, " +
+                                "so you can keep the menu, the hours and the tables right.",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        SecondaryButton(
+                            text = "Claim this restaurant",
+                            onClick = { onClaim(loaded.id, loaded.name) },
+                        )
+                    }
+                }
             }
         }
     }

@@ -3,7 +3,7 @@ package com.example.kulapro.data.repository
 import android.content.Context
 import kotlinx.coroutines.flow.Flow
 
-interface AuthRepository {
+interface AuthRepository : ClaimsRepository {
     /** The signed-in user's uid, or null. Read synchronously to pick a start destination. */
     val currentUserId: String?
 
@@ -36,15 +36,6 @@ interface AuthRepository {
     suspend fun updateEmail(newEmail: String, currentPassword: String): Result<Unit>
 
     suspend fun updatePassword(newPassword: String, currentPassword: String): Result<Unit>
-
-    /**
-     * Restaurants this user may manage, read from their Firebase Auth custom claims.
-     *
-     * Claims are signed by Firebase and cannot be edited by the client, unlike the role
-     * field on the profile document, which its owner can write. Anything that grants
-     * privilege must read from here.
-     */
-    suspend fun managedRestaurantIds(forceRefresh: Boolean = false): Result<List<String>>
 
     fun signOut()
 }

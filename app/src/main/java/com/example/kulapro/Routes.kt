@@ -14,6 +14,12 @@ object Routes {
     const val ABOUT = "about"
     const val OWNER = "owner/{restaurantId}"
     const val RESTAURANT = "restaurant/{restaurantId}"
+    const val CLAIM_RESTAURANT = "claim/{restaurantId}/{restaurantName}"
+    const val LIST_RESTAURANT = "listRestaurant"
+    const val OWNERSHIP_REVIEW = "ownershipReview"
+
+    fun claimRestaurant(restaurantId: String, restaurantName: String): String =
+        "claim/$restaurantId/${encode(restaurantName)}"
 
     fun restaurant(restaurantId: String): String = "restaurant/$restaurantId"
 

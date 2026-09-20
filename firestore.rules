@@ -31,10 +31,25 @@ service cloud.firestore {
       return role() == 'PLATFORM_ADMIN';
     }
 
+    // Ownership has two sources and neither can be granted by the person it empowers.
+    //
+    // A custom claim is signed by Firebase, so a client cannot forge one, but only trusted
+    // server code can issue one, which meant every grant needed a privileged script.
+    // The ownerUserId field closes that gap: it sits on the restaurant document, where the
+    // rule below lets only a platform admin write it, so an approval takes effect the
+    // moment a reviewer taps it while still being a decision no ordinary user can make.
+    //
+    // The cost is one extra document read per owner write. At this number of restaurants
+    // that is the right trade for not needing a deploy to hand someone their own listing.
     function managesRestaurant(restaurantId) {
       return isSignedIn() && (
         isPlatformAdmin() ||
-        restaurantId in request.auth.token.get('managedRestaurants', [])
+        restaurantId in request.auth.token.get('managedRestaurants', []) ||
+        (
+          exists(/databases/$(database)/documents/restaurants/$(restaurantId)) &&
+          get(/databases/$(database)/documents/restaurants/$(restaurantId))
+            .data.get('ownerUserId', '') == request.auth.uid
+        )
       );
     }
 
@@ -59,7 +74,18 @@ service cloud.firestore {
 
     match /restaurants/{restaurantId} {
       allow read: if true;
-      allow write: if managesRestaurant(restaurantId);
+
+      // Creating and deleting a listing is a platform decision, so a new restaurant only
+      // appears when a reviewer approves the request asking for it.
+      allow create, delete: if isPlatformAdmin();
+
+      // An owner runs their restaurant but cannot hand it on or take another. Pinning
+      // ownerUserId to its current value is what stops a granted owner from granting.
+      allow update: if isPlatformAdmin() || (
+        managesRestaurant(restaurantId) &&
+        request.resource.data.get('ownerUserId', '')
+          == resource.data.get('ownerUserId', '')
+      );
 
       match /menuItems/{menuItemId} {
         allow read: if true;
@@ -145,6 +171,35 @@ service cloud.firestore {
 
         allow delete: if isSignedIn() && resource.data.userId == request.auth.uid;
       }
+    }
+
+    // ---- ownership requests --------------------------------------------------
+
+    match /ownershipRequests/{requestId} {
+      // A requester sees their own, a reviewer sees all of them. Nobody else sees any:
+      // these carry a phone number and a stated connection to a business.
+      allow read: if isSignedIn() && (
+        resource.data.userId == request.auth.uid || isPlatformAdmin()
+      );
+
+      // Anyone signed in may ask. The request is a statement, not a grant, and asking is
+      // the only part of this a user is trusted with.
+      allow create: if isSignedIn()
+        && request.resource.data.userId == request.auth.uid
+        && request.resource.data.status == 'PENDING'
+        && request.resource.data.type in ['CLAIM', 'NEW_LISTING']
+        && request.resource.data.get('reviewedBy', '') == ''
+        && request.resource.data.get('reviewNote', '') == '';
+
+      // Only a reviewer decides, and only on a request still waiting. Without the second
+      // condition an approval could be replayed over a rejection.
+      allow update: if isPlatformAdmin()
+        && resource.data.status == 'PENDING'
+        && request.resource.data.userId == resource.data.userId
+        && request.resource.data.status in ['APPROVED', 'REJECTED'];
+
+      // Kept, so there is a record of who asked for what and who decided.
+      allow delete: if false;
     }
 
     // ---- reservations --------------------------------------------------------

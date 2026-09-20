@@ -242,6 +242,13 @@ class AuthRepositoryFirebase(
         }
     }
 
+    override suspend fun isPlatformAdmin(forceRefresh: Boolean): Result<Boolean> {
+        val user = auth.currentUser ?: return Result.Success(false)
+        return runCatchingAuth {
+            user.getIdToken(forceRefresh).await().claims[CLAIM_ROLE] == ROLE_PLATFORM_ADMIN
+        }
+    }
+
     override fun signOut() = auth.signOut()
 }
 
@@ -261,3 +268,5 @@ private inline fun <T> runCatchingAuth(block: () -> T): Result<T> = try {
 }
 
 private const val CLAIM_MANAGED_RESTAURANTS = "managedRestaurants"
+private const val CLAIM_ROLE = "role"
+private const val ROLE_PLATFORM_ADMIN = "PLATFORM_ADMIN"

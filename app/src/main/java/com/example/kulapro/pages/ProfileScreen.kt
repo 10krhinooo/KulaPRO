@@ -40,6 +40,7 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
@@ -52,10 +53,14 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
 import com.example.kulapro.Routes
+import com.example.kulapro.data.model.OwnershipRequest
 import com.example.kulapro.data.repository.AuthRepository
 import com.example.kulapro.data.repository.AuthRepositoryFirebase
+import com.example.kulapro.data.repository.OwnershipRepository
+import com.example.kulapro.data.repository.OwnershipRepositoryFirestore
 import com.example.kulapro.data.repository.ProfileRepository
 import com.example.kulapro.data.repository.Result
+import com.example.kulapro.feature.ownership.MyRequestsCard
 import com.example.kulapro.ui.components.KulaPasswordField
 import com.example.kulapro.ui.components.KulaTextField
 import com.example.kulapro.ui.components.MessageHost
@@ -83,9 +88,13 @@ fun ProfilePage(
     navController: NavController,
     onSignIn: () -> Unit,
     modifier: Modifier = Modifier,
+    onListRestaurant: () -> Unit = {},
+    /** Null for everyone who does not review ownership requests, which is almost everyone. */
+    onReviewRequests: (() -> Unit)? = null,
     appContext: android.content.Context = LocalContext.current.applicationContext,
     authRepository: AuthRepository = remember { AuthRepositoryFirebase(appContext) },
     profileRepository: ProfileRepository = authRepository as ProfileRepository,
+    ownershipRepository: OwnershipRepository = remember { OwnershipRepositoryFirestore() },
 ) {
     val scope = rememberCoroutineScope()
     val messages = rememberMessageHostState()
@@ -94,6 +103,18 @@ fun ProfilePage(
     val signedInUserId by authRepository.authState()
         .collectAsStateWithLifecycle(initialValue = authRepository.currentUserId)
     val email = signedInUserId?.let { authRepository.currentUserEmail }
+
+    // Keyed on the signed-in user so signing out clears the previous account's requests
+    // rather than showing them to whoever signs in next.
+    val myRequests by produceState(
+        initialValue = emptyList<OwnershipRequest>(),
+        signedInUserId,
+    ) {
+        value = emptyList()
+        if (signedInUserId != null) {
+            ownershipRepository.myRequests().collect { value = it }
+        }
+    }
 
     var expandedSection by remember { mutableStateOf<String?>(null) }
     var isBusy by remember { mutableStateOf(false) }
@@ -273,6 +294,19 @@ fun ProfilePage(
                         }
                     },
                 )
+            }
+
+            MyRequestsCard(requests = myRequests)
+
+            // Offered to everyone: most diners never tap it, and the ones who do are the
+            // restaurants this app is short of.
+            SecondaryButton(
+                text = "List your restaurant",
+                onClick = onListRestaurant,
+            )
+
+            onReviewRequests?.let { review ->
+                SecondaryButton(text = "Review ownership requests", onClick = review)
             }
 
             SecondaryButton(

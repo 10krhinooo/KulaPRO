@@ -6,7 +6,7 @@ import {
   assertSucceeds,
   initializeTestEnvironment,
 } from '@firebase/rules-unit-testing';
-import { doc, getDoc, setDoc, updateDoc } from 'firebase/firestore';
+import { deleteDoc, doc, getDoc, setDoc, updateDoc } from 'firebase/firestore';
 
 /**
  * These tests are the only place the security model is actually proved. Reading the rules
@@ -18,11 +18,16 @@ const ALICE = 'alice';
 const BOB = 'bob';
 const RESTAURANT = 'the-bistro';
 const OTHER_RESTAURANT = 'sushi-bar';
+const OWNED_RESTAURANT = 'bobs-place';
 
 let testEnv;
 
 /** Signed in as a plain diner, with no ownership claims. */
 const diner = (uid) => testEnv.authenticatedContext(uid).firestore();
+
+/** Signed in as a platform reviewer, the one role bootstrapped out of band. */
+const admin = (uid) =>
+  testEnv.authenticatedContext(uid, { role: 'PLATFORM_ADMIN' }).firestore();
 
 /** Signed in with a claim naming one restaurant, the way the grant script issues it. */
 const owner = (uid, restaurantId) =>
@@ -49,6 +54,27 @@ beforeEach(async () => {
     const db = context.firestore();
     await setDoc(doc(db, 'restaurants', RESTAURANT), { name: 'The Bistro' });
     await setDoc(doc(db, 'restaurants', OTHER_RESTAURANT), { name: 'Sushi Bar' });
+    await setDoc(doc(db, 'restaurants', OWNED_RESTAURANT), {
+      name: 'Bob\'s Place',
+      ownerUserId: BOB,
+    });
+    await setDoc(doc(db, 'ownershipRequests', 'req-alice'), {
+      userId: ALICE,
+      userEmail: 'alice@example.com',
+      type: 'CLAIM',
+      restaurantId: RESTAURANT,
+      status: 'PENDING',
+      reviewedBy: '',
+      reviewNote: '',
+    });
+    await setDoc(doc(db, 'ownershipRequests', 'req-settled'), {
+      userId: ALICE,
+      type: 'CLAIM',
+      restaurantId: OTHER_RESTAURANT,
+      status: 'REJECTED',
+      reviewedBy: 'carol',
+      reviewNote: 'Could not confirm',
+    });
     await setDoc(doc(db, 'users', ALICE), { email: 'alice@example.com', role: 'DINER' });
     await setDoc(doc(db, 'reservations', 'alice-booking'), {
       userId: ALICE,
@@ -331,6 +357,158 @@ describe('floor plan', () => {
         startsAtSeconds: 1700000000,
         seatsTaken: 6,
         takenTableIds: ['t01', 't02'],
+      }),
+    );
+  });
+});
+
+
+describe('ownership requests', () => {
+  const request = (overrides = {}) => ({
+    userId: ALICE,
+    userEmail: 'alice@example.com',
+    type: 'CLAIM',
+    restaurantId: RESTAURANT,
+    status: 'PENDING',
+    reviewedBy: '',
+    reviewNote: '',
+    ...overrides,
+  });
+
+  it('lets a signed-in user ask about a restaurant', async () => {
+    await assertSucceeds(
+      setDoc(doc(diner(ALICE), 'ownershipRequests/new-1'), request()),
+    );
+  });
+
+  it('refuses a guest, since a request has to be from someone', async () => {
+    await assertFails(
+      setDoc(
+        doc(testEnv.unauthenticatedContext().firestore(), 'ownershipRequests/new-2'),
+        request(),
+      ),
+    );
+  });
+
+  it("refuses a request raised in someone else's name", async () => {
+    await assertFails(
+      setDoc(doc(diner(BOB), 'ownershipRequests/new-3'), request({ userId: ALICE })),
+    );
+  });
+
+  it('refuses a request that arrives already approved', async () => {
+    await assertFails(
+      setDoc(doc(diner(ALICE), 'ownershipRequests/new-4'), request({ status: 'APPROVED' })),
+    );
+  });
+
+  it('lets the requester follow their own request', async () => {
+    await assertSucceeds(getDoc(doc(diner(ALICE), 'ownershipRequests/req-alice')));
+  });
+
+  it("refuses a user another person's request", async () => {
+    await assertFails(getDoc(doc(diner(BOB), 'ownershipRequests/req-alice')));
+  });
+
+  it('lets a reviewer read any request', async () => {
+    await assertSucceeds(getDoc(doc(admin('carol'), 'ownershipRequests/req-alice')));
+  });
+
+  it('refuses a user approving their own request', async () => {
+    await assertFails(
+      updateDoc(doc(diner(ALICE), 'ownershipRequests/req-alice'), { status: 'APPROVED' }),
+    );
+  });
+
+  it('lets a reviewer approve a waiting request', async () => {
+    await assertSucceeds(
+      updateDoc(doc(admin('carol'), 'ownershipRequests/req-alice'), {
+        status: 'APPROVED',
+        reviewedBy: 'carol',
+      }),
+    );
+  });
+
+  it('refuses a second decision on a settled request', async () => {
+    await assertFails(
+      updateDoc(doc(admin('carol'), 'ownershipRequests/req-settled'), {
+        status: 'APPROVED',
+        reviewedBy: 'carol',
+      }),
+    );
+  });
+
+  it('refuses a decision that reassigns who asked', async () => {
+    await assertFails(
+      updateDoc(doc(admin('carol'), 'ownershipRequests/req-alice'), {
+        status: 'APPROVED',
+        userId: BOB,
+      }),
+    );
+  });
+
+  it('refuses deletion, so the record of who decided survives', async () => {
+    await assertFails(deleteDoc(doc(admin('carol'), 'ownershipRequests/req-alice')));
+  });
+});
+
+describe('granted ownership', () => {
+  it('lets a reviewer hand a restaurant to a user', async () => {
+    await assertSucceeds(
+      updateDoc(doc(admin('carol'), 'restaurants', RESTAURANT), { ownerUserId: ALICE }),
+    );
+  });
+
+  it('refuses a user writing the owner field onto a restaurant', async () => {
+    await assertFails(
+      updateDoc(doc(diner(ALICE), 'restaurants', RESTAURANT), { ownerUserId: ALICE }),
+    );
+  });
+
+  it('lets a granted owner edit their restaurant without any claim', async () => {
+    await assertSucceeds(
+      updateDoc(doc(diner(BOB), 'restaurants', OWNED_RESTAURANT), { name: 'Bob Place' }),
+    );
+  });
+
+  it('refuses a granted owner a restaurant that is not theirs', async () => {
+    await assertFails(
+      updateDoc(doc(diner(BOB), 'restaurants', RESTAURANT), { name: 'Hijacked' }),
+    );
+  });
+
+  it('refuses a granted owner handing their restaurant to someone else', async () => {
+    // Otherwise a single grant would let ownership spread without a reviewer ever
+    // seeing it again.
+    await assertFails(
+      updateDoc(doc(diner(BOB), 'restaurants', OWNED_RESTAURANT), { ownerUserId: ALICE }),
+    );
+  });
+
+  it('lets a granted owner map their floor and publish a menu', async () => {
+    await assertSucceeds(
+      setDoc(doc(diner(BOB), `restaurants/${OWNED_RESTAURANT}/tables/t01`), {
+        restaurantId: OWNED_RESTAURANT,
+        label: 'W1',
+        seats: 4,
+        zone: 'Window',
+        row: 0,
+        column: 0,
+      }),
+    );
+  });
+
+  it('refuses anyone but a reviewer creating a listing', async () => {
+    await assertFails(
+      setDoc(doc(diner(ALICE), 'restaurants', 'invented'), { name: 'Invented' }),
+    );
+  });
+
+  it('lets a reviewer create a listing on approval', async () => {
+    await assertSucceeds(
+      setDoc(doc(admin('carol'), 'restaurants', 'approved-listing'), {
+        name: 'Approved Listing',
+        ownerUserId: ALICE,
       }),
     );
   });

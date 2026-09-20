@@ -33,4 +33,14 @@ data class Restaurant(
     /** Opening hours keyed by lowercase day name, e.g. "monday" to "12:00-22:00". */
     val openingHours: Map<String, String> = emptyMap(),
     val slotDurationMinutes: Int = 90,
+    /**
+     * The user who manages this restaurant, written only by a platform admin.
+     *
+     * Ownership is also carried as an Auth custom claim, which a client can never forge.
+     * This field is the second half of the same guarantee: it is on a document the owner
+     * cannot write the field of, so granting it is still a decision only a reviewer makes,
+     * but the grant takes effect the moment it is written rather than waiting on a
+     * privileged script.
+     */
+    val ownerUserId: String = "",
 )

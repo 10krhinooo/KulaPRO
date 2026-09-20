@@ -40,6 +40,8 @@ import com.example.kulapro.data.repository.AuthRepository
 import com.example.kulapro.data.repository.AuthRepositoryFirebase
 import com.example.kulapro.data.repository.Result
 import com.example.kulapro.feature.owner.OwnerPortal
+import com.example.kulapro.feature.ownership.OwnershipRequestScreen
+import com.example.kulapro.feature.ownership.OwnershipReviewScreen
 import com.example.kulapro.pages.AboutScreen
 import com.example.kulapro.pages.ForgotPasswordScreen
 import com.example.kulapro.pages.HomePage
@@ -82,14 +84,20 @@ fun KulaProNavigation(
     val signedInUserId by authRepository.authState()
         .collectAsStateWithLifecycle(initialValue = authRepository.currentUserId)
     var managedRestaurants by remember { mutableStateOf<List<String>>(emptyList()) }
+    var isReviewer by remember { mutableStateOf(false) }
     LaunchedEffect(signedInUserId) {
-        managedRestaurants = if (signedInUserId == null) {
-            emptyList()
-        } else {
-            when (val result = authRepository.managedRestaurantIds(true)) {
-                is Result.Success -> result.data
-                is Result.Failure -> emptyList()
-            }
+        if (signedInUserId == null) {
+            managedRestaurants = emptyList()
+            isReviewer = false
+            return@LaunchedEffect
+        }
+        managedRestaurants = when (val result = authRepository.managedRestaurantIds(true)) {
+            is Result.Success -> result.data
+            is Result.Failure -> emptyList()
+        }
+        isReviewer = when (val result = authRepository.isPlatformAdmin()) {
+            is Result.Success -> result.data
+            is Result.Failure -> false
         }
     }
 
@@ -224,8 +232,39 @@ fun KulaProNavigation(
                             destination = Routes.RESERVATIONS,
                         )
                     },
+                    onClaim = { restaurantId, restaurantName ->
+                        requireSignIn(
+                            action = "claim a restaurant",
+                            destination = Routes.claimRestaurant(restaurantId, restaurantName),
+                        )
+                    },
                     isSignedIn = signedInUserId != null,
                 )
+            }
+
+            composable(
+                route = Routes.CLAIM_RESTAURANT,
+                arguments = listOf(
+                    navArgument("restaurantId") { type = NavType.StringType },
+                    navArgument("restaurantName") { type = NavType.StringType },
+                ),
+            ) { entry ->
+                OwnershipRequestScreen(
+                    restaurantId = entry.arguments?.getString("restaurantId").orEmpty(),
+                    restaurantName = URLDecoder.decode(
+                        entry.arguments?.getString("restaurantName").orEmpty(),
+                        StandardCharsets.UTF_8.name(),
+                    ),
+                    onBack = { navController.popBackStack() },
+                )
+            }
+
+            composable(Routes.LIST_RESTAURANT) {
+                OwnershipRequestScreen(onBack = { navController.popBackStack() })
+            }
+
+            composable(Routes.OWNERSHIP_REVIEW) {
+                OwnershipReviewScreen(onBack = { navController.popBackStack() })
             }
             composable(Routes.RESERVATIONS) {
                 ReservationScreen(
@@ -239,6 +278,14 @@ fun KulaProNavigation(
                 ProfilePage(
                     navController = navController,
                     onSignIn = { navController.navigate(Routes.login(next = Routes.PROFILE)) },
+                    onListRestaurant = { navController.navigate(Routes.LIST_RESTAURANT) },
+                    // Only offered to a reviewer, so the app never shows a door the rules
+                    // would refuse to open.
+                    onReviewRequests = if (isReviewer) {
+                        { navController.navigate(Routes.OWNERSHIP_REVIEW) }
+                    } else {
+                        null
+                    },
                 )
             }
             composable(Routes.ABOUT) { AboutScreen(onBack = { navController.popBackStack() }) }
