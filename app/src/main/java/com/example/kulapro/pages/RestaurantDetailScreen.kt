@@ -66,7 +66,9 @@ import com.example.kulapro.ui.components.PrimaryButton
 import com.example.kulapro.ui.components.RatingBar
 import com.example.kulapro.ui.components.SecondaryButton
 import com.example.kulapro.ui.components.ShimmerBox
+import com.example.kulapro.ui.components.RESTAURANT_WASH_ALPHA
 import com.example.kulapro.ui.components.cuisinePhoto
+import com.example.kulapro.ui.components.restaurantWash
 import com.example.kulapro.ui.components.rememberMessageHostState
 import com.example.kulapro.util.openDialer
 import com.example.kulapro.util.openMapPin
@@ -303,6 +305,18 @@ private fun DetailHero(restaurant: Restaurant, onBack: () -> Unit) {
             contentScale = ContentScale.Crop,
             modifier = Modifier.fillMaxSize(),
         )
+
+        // Only over the stand-in, so the same bundled photo reads as a different restaurant
+        // each time it is reused. A restaurant's own photograph is left exactly as it is.
+        if (restaurant.imageUrl.isBlank()) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(
+                        restaurantWash(restaurant.name).copy(alpha = RESTAURANT_WASH_ALPHA),
+                    ),
+            )
+        }
 
         // A scrim under the title and the back button, so both stay legible whatever the
         // photo is doing behind them.

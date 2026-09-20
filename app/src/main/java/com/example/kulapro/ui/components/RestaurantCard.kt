@@ -82,6 +82,7 @@ fun RestaurantCard(
             RestaurantImage(
                 imageUrl = restaurant.imageUrl,
                 fallback = cuisinePhoto(restaurant.cuisine, restaurant.name),
+                wash = restaurantWash(restaurant.name),
                 contentDescription = restaurant.name,
                 modifier = Modifier
                     .fillMaxWidth()
@@ -173,19 +174,35 @@ fun RestaurantCard(
 private fun RestaurantImage(
     imageUrl: String,
     @DrawableRes fallback: Int,
+    wash: Color,
     contentDescription: String,
     modifier: Modifier = Modifier,
 ) {
-    // A restaurant that has published a photo shows it; everything else shows a bundled
-    // photo of the food it serves, which reads as a restaurant in a way an icon does not.
-    AsyncImage(
-        model = imageUrl.ifBlank { fallback },
-        placeholder = painterResource(fallback),
-        error = painterResource(fallback),
-        contentDescription = contentDescription,
-        contentScale = ContentScale.Crop,
-        modifier = modifier,
-    )
+    val isOwnPhoto = imageUrl.isNotBlank()
+
+    Box(modifier = modifier) {
+        // A restaurant that has published a photo shows it; everything else shows a bundled
+        // photo of the food it serves, which reads as a restaurant in a way an icon does not.
+        AsyncImage(
+            model = imageUrl.ifBlank { fallback },
+            placeholder = painterResource(fallback),
+            error = painterResource(fallback),
+            contentDescription = contentDescription,
+            contentScale = ContentScale.Crop,
+            modifier = Modifier.matchParentSize(),
+        )
+
+        // Only over the stand-in. The whole reason for the wash is that a handful of bundled
+        // photos have to stand for a dozen restaurants; a restaurant's own photograph is
+        // already its own, and tinting it would be vandalism.
+        if (!isOwnPhoto) {
+            Box(
+                modifier = Modifier
+                    .matchParentSize()
+                    .background(wash.copy(alpha = RESTAURANT_WASH_ALPHA)),
+            )
+        }
+    }
 }
 
 @Composable

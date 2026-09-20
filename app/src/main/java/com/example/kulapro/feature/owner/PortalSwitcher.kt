@@ -76,10 +76,13 @@ fun PortalSwitcher(
             )
             Text(
                 // Names the destination, not the current state: a control that says where it
-                // takes you is read correctly the first time.
-                text = if (target == Portal.OWNER) "Switch to hosting" else "Switch to booking",
+                // takes you is read correctly the first time. Kept to one word because this
+                // sits in a top bar beside the wordmark, and "Switch to hosting" was wide
+                // enough to push "KulaPro" into an ellipsis.
+                text = if (target == Portal.OWNER) "Hosting" else "Booking",
                 style = MaterialTheme.typography.labelLarge,
                 color = content,
+                maxLines = 1,
             )
         }
     }
