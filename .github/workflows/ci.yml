@@ -30,6 +30,13 @@ jobs:
           packages: ''
       - uses: gradle/actions/setup-gradle@v4
       - run: ./gradlew assembleDebug
+      # Published so anyone can install the branch without a checkout or a toolchain.
+      - name: Upload debug APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: kulapro-debug-apk
+          path: app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
 
   test:
     name: Unit tests and coverage
