@@ -35,6 +35,8 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.dp
+import androidx.annotation.DrawableRes
+import androidx.compose.ui.res.painterResource
 import coil.compose.AsyncImage
 import com.example.kulapro.data.model.Restaurant
 import com.example.kulapro.ui.theme.LocalReduceMotion
@@ -79,6 +81,7 @@ fun RestaurantCard(
         Box {
             RestaurantImage(
                 imageUrl = restaurant.imageUrl,
+                fallback = cuisinePhoto(restaurant.cuisine, restaurant.name),
                 contentDescription = restaurant.name,
                 modifier = Modifier
                     .fillMaxWidth()
@@ -169,30 +172,20 @@ fun RestaurantCard(
 @Composable
 private fun RestaurantImage(
     imageUrl: String,
+    @DrawableRes fallback: Int,
     contentDescription: String,
     modifier: Modifier = Modifier,
 ) {
-    if (imageUrl.isBlank()) {
-        // Seeded restaurants have no photo yet. A branded placeholder beats a grey void.
-        Box(
-            modifier = modifier.background(MaterialTheme.colorScheme.primaryContainer),
-            contentAlignment = Alignment.Center,
-        ) {
-            Icon(
-                imageVector = Icons.Outlined.Restaurant,
-                contentDescription = contentDescription,
-                modifier = Modifier.size(48.dp),
-                tint = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.5f),
-            )
-        }
-    } else {
-        AsyncImage(
-            model = imageUrl,
-            contentDescription = contentDescription,
-            contentScale = ContentScale.Crop,
-            modifier = modifier,
-        )
-    }
+    // A restaurant that has published a photo shows it; everything else shows a bundled
+    // photo of the food it serves, which reads as a restaurant in a way an icon does not.
+    AsyncImage(
+        model = imageUrl.ifBlank { fallback },
+        placeholder = painterResource(fallback),
+        error = painterResource(fallback),
+        contentDescription = contentDescription,
+        contentScale = ContentScale.Crop,
+        modifier = modifier,
+    )
 }
 
 @Composable

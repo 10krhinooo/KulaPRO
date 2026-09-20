@@ -56,8 +56,10 @@ import com.example.kulapro.data.repository.RestaurantRepositoryFirestore
 import com.example.kulapro.data.repository.Result
 import com.example.kulapro.data.repository.ReviewRepository
 import com.example.kulapro.data.repository.ReviewRepositoryFirestore
+import androidx.compose.ui.res.painterResource
 import com.example.kulapro.ui.components.AnimatedListItem
 import com.example.kulapro.ui.components.MessageHost
+import com.example.kulapro.ui.components.cuisinePhoto
 import com.example.kulapro.ui.components.PrimaryButton
 import com.example.kulapro.ui.components.RatingBar
 import com.example.kulapro.ui.components.SecondaryButton
@@ -245,28 +247,17 @@ fun RestaurantDetailScreen(
 @Composable
 private fun DetailHero(restaurant: Restaurant, onBack: () -> Unit) {
     Box(modifier = Modifier.fillMaxWidth().height(HERO_HEIGHT)) {
-        if (restaurant.imageUrl.isBlank()) {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(MaterialTheme.colorScheme.primaryContainer),
-                contentAlignment = Alignment.Center,
-            ) {
-                Icon(
-                    imageVector = Icons.Rounded.Restaurant,
-                    contentDescription = null,
-                    modifier = Modifier.size(64.dp),
-                    tint = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.5f),
-                )
-            }
-        } else {
-            AsyncImage(
-                model = restaurant.imageUrl,
-                contentDescription = restaurant.name,
-                contentScale = ContentScale.Crop,
-                modifier = Modifier.fillMaxSize(),
-            )
-        }
+        // Falls back to a bundled photo of the cuisine when the restaurant has not published
+        // one, so the page opens on food rather than on a placeholder.
+        val fallback = cuisinePhoto(restaurant.cuisine, restaurant.name)
+        AsyncImage(
+            model = restaurant.imageUrl.ifBlank { fallback },
+            placeholder = painterResource(fallback),
+            error = painterResource(fallback),
+            contentDescription = restaurant.name,
+            contentScale = ContentScale.Crop,
+            modifier = Modifier.fillMaxSize(),
+        )
 
         // A scrim under the title and the back button, so both stay legible whatever the
         // photo is doing behind them.
