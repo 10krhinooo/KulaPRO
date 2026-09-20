@@ -3,6 +3,8 @@ package com.example.kulapro.data.repository
 import com.example.kulapro.data.model.Reservation
 import com.example.kulapro.data.model.ReservationStatus
 import com.example.kulapro.data.model.SlotCount
+import com.example.kulapro.util.UserFacingException
+import com.example.kulapro.util.userMessageFor
 import com.google.firebase.Timestamp
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
@@ -54,7 +56,9 @@ class ReservationRepositoryFirestore(
 
     override suspend fun create(reservation: Reservation): Result<String> {
         val uid = auth.currentUser?.uid
-            ?: return Result.Failure("You need to be signed in to book a table")
+            ?: return Result.Failure(
+                "Sign in to book a table, so we know the reservation is yours.",
+            )
         return runCatchingFirestore {
             // userId is stamped here, never taken from the caller. Security rules match on
             // it, so a reservation that carried someone else's uid would be both a data leak
@@ -76,7 +80,9 @@ class ReservationRepositoryFirestore(
                 // Read inside the transaction, so two diners racing for the same table
                 // cannot both win it.
                 if (toSave.tableId.isNotBlank() && toSave.tableId in alreadyTaken) {
-                    error("That table has just been taken. Pick another.")
+                    throw UserFacingException(
+                        "That table was taken while you were choosing. Pick another one.",
+                    )
                 }
                 transaction.set(document, toSave)
                 transaction.set(
@@ -102,14 +108,26 @@ class ReservationRepositoryFirestore(
             .document(reservationId)
 
         firestore.runTransaction { transaction ->
+            // Every read has to happen before the first write. Firestore rejects the whole
+            // transaction otherwise, which is what made cancelling fail: the reservation was
+            // updated and only then was the slot counter read.
             val reservation = transaction.get(reservationRef).toObject(Reservation::class.java)
-                ?: error("Reservation not found")
+                ?: throw UserFacingException(
+                    "We could not find that booking. Pull to refresh and try again.",
+                )
+            val releasesSeats = reservation.statusEnum.occupiesCapacity
+            val slot = slotDocument(reservation.restaurantId, reservation.startsAt.seconds)
+            val current = if (releasesSeats) {
+                transaction.get(slot).toObject(SlotCount::class.java)
+            } else {
+                null
+            }
+
             transaction.update(reservationRef, "status", ReservationStatus.CANCELLED.name)
 
-            // Give the seats back, so a cancelled booking stops blocking the slot.
-            if (reservation.statusEnum.occupiesCapacity) {
-                val slot = slotDocument(reservation.restaurantId, reservation.startsAt.seconds)
-                val current = transaction.get(slot).toObject(SlotCount::class.java)
+            // Give the seats and the table back, so a cancelled booking stops blocking the
+            // slot. A booking that was already cancelled or completed never held them.
+            if (releasesSeats) {
                 transaction.set(
                     slot,
                     SlotCount(
@@ -147,5 +165,7 @@ internal inline fun <T> runCatchingFirestore(block: () -> T): Result<T> = try {
 } catch (e: CancellationException) {
     throw e
 } catch (e: Exception) {
-    Result.Failure(e.message ?: "Could not reach the server", e)
+    // Translated rather than passed through. A backend error code or an exception message
+    // tells the user nothing they can act on, and shows them the inside of the system.
+    Result.Failure(userMessageFor(e), e)
 }

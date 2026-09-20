@@ -1,6 +1,8 @@
 package com.example.kulapro.data.repository
 
+import com.example.kulapro.util.UserFacingException
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -17,20 +19,35 @@ class RunCatchingFirestoreTest {
     }
 
     @Test
-    fun `reports a thrown error as failure with its message`() {
-        val result = runCatchingFirestore<String> { error("Missing or insufficient permissions") }
+    fun `shows a message written for the user rather than the exception text`() {
+        val result = runCatchingFirestore<String> {
+            throw UserFacingException("That table was taken. Pick another one.")
+        }
 
         assertTrue(result is Result.Failure)
-        assertEquals("Missing or insufficient permissions", (result as Result.Failure).message)
+        assertEquals("That table was taken. Pick another one.", (result as Result.Failure).message)
     }
 
     @Test
-    fun `falls back to a readable message when the error carries none`() {
-        // Firestore raises plenty of exceptions with a null message, and "null" is not
-        // something to put in front of a diner.
-        val result = runCatchingFirestore<String> { throw IllegalArgumentException() }
+    fun `never puts raw exception text in front of the user`() {
+        // Firestore messages read like "PERMISSION_DENIED: Missing or insufficient
+        // permissions", which tells a diner nothing and exposes the inside of the system.
+        val result = runCatchingFirestore<String> {
+            error("PERMISSION_DENIED: Missing or insufficient permissions")
+        }
 
-        assertEquals("Could not reach the server", (result as Result.Failure).message)
+        val message = (result as Result.Failure).message
+        assertFalse(message.contains("PERMISSION_DENIED"))
+        assertTrue(message.contains("try again", ignoreCase = true))
+    }
+
+    @Test
+    fun `keeps the cause for logging even though it is not shown`() {
+        val cause = IllegalArgumentException("internal detail")
+
+        val result = runCatchingFirestore<String> { throw cause }
+
+        assertEquals(cause, (result as Result.Failure).cause)
     }
 
     @Test

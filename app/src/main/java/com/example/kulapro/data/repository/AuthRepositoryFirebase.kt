@@ -9,6 +9,7 @@ import androidx.credentials.exceptions.NoCredentialException
 import com.example.kulapro.R
 import com.example.kulapro.data.model.UserProfile
 import com.example.kulapro.util.ImageDownscaler
+import com.example.kulapro.util.userMessageFor
 import com.google.android.libraries.identity.googleid.GetGoogleIdOption
 import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential
 import com.google.firebase.auth.EmailAuthProvider
@@ -101,11 +102,15 @@ class AuthRepositoryFirebase(
         // a screen the user has already left.
         throw e
     } catch (e: GetCredentialCancellationException) {
-        Result.Failure("Sign-in cancelled", e)
+        Result.Failure("Google sign-in was cancelled. Try again when you are ready.", e)
     } catch (e: NoCredentialException) {
-        Result.Failure("No Google account found on this device", e)
+        Result.Failure(
+            "There is no Google account on this device. Add one in Settings, or sign in " +
+                "with your email and password.",
+            e,
+        )
     } catch (e: Exception) {
-        Result.Failure(e.message ?: "Google sign-in failed", e)
+        Result.Failure(userMessageFor(e), e)
     }
 
     override suspend fun sendPasswordReset(email: String): Result<Unit> = runCatchingAuth {
@@ -142,7 +147,10 @@ class AuthRepositoryFirebase(
     }
 
     override suspend fun profile(): Result<UserProfile> {
-        val uid = currentUserId ?: return Result.Failure("Not signed in")
+        val uid = currentUserId
+            ?: return Result.Failure(
+                "You need to be signed in for that. Sign in and try again.",
+            )
         return runCatchingAuth {
             firestore.collection(FirestorePaths.USERS).document(uid).get().await()
                 .toObject(UserProfile::class.java)
@@ -173,7 +181,10 @@ class AuthRepositoryFirebase(
         displayName: String,
         phone: String,
     ): Result<Unit> {
-        val uid = currentUserId ?: return Result.Failure("Not signed in")
+        val uid = currentUserId
+            ?: return Result.Failure(
+                "You need to be signed in for that. Sign in and try again.",
+            )
         return runCatchingAuth {
             firestore.collection(FirestorePaths.USERS)
                 .document(uid)
@@ -186,11 +197,16 @@ class AuthRepositoryFirebase(
     }
 
     override suspend fun updateProfilePhoto(imageUri: Uri): Result<String> {
-        val uid = currentUserId ?: return Result.Failure("Not signed in")
+        val uid = currentUserId
+            ?: return Result.Failure(
+                "You need to be signed in for that. Sign in and try again.",
+            )
         val dataUri = ImageDownscaler.toDataUri {
             context.contentResolver.openInputStream(imageUri)
         }
-            ?: return Result.Failure("That image could not be read")
+            ?: return Result.Failure(
+            "We could not read that image. Try a different photo, or one from your gallery.",
+        )
         return runCatchingAuth {
             firestore.collection(FirestorePaths.USERS)
                 .document(uid)
@@ -201,7 +217,10 @@ class AuthRepositoryFirebase(
     }
 
     override suspend fun removeProfilePhoto(): Result<Unit> {
-        val uid = currentUserId ?: return Result.Failure("Not signed in")
+        val uid = currentUserId
+            ?: return Result.Failure(
+                "You need to be signed in for that. Sign in and try again.",
+            )
         return runCatchingAuth {
             firestore.collection(FirestorePaths.USERS)
                 .document(uid)
@@ -238,7 +257,7 @@ private inline fun <T> runCatchingAuth(block: () -> T): Result<T> = try {
 } catch (e: CancellationException) {
     throw e
 } catch (e: Exception) {
-    Result.Failure(e.message ?: "Something went wrong", e)
+    Result.Failure(userMessageFor(e), e)
 }
 
 private const val CLAIM_MANAGED_RESTAURANTS = "managedRestaurants"

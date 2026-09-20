@@ -35,9 +35,14 @@ class ReviewRepositoryFirestore(
 
     override suspend fun submit(review: Review): Result<Unit> {
         val uid = auth.currentUser?.uid
-            ?: return Result.Failure("You need to be signed in to leave a review")
+            ?: return Result.Failure(
+                "Sign in to leave a review, so the restaurant knows who it is from.",
+            )
         if (review.reservationId.isBlank()) {
-            return Result.Failure("A review must reference the visit it is about")
+            return Result.Failure(
+                "You can review a restaurant once you have eaten there on a booking made " +
+                    "through KulaPro.",
+            )
         }
         return runCatchingFirestore {
             // One review per reservation: using the reservation id as the document id makes
