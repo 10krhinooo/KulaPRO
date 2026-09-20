@@ -8,12 +8,17 @@ interface ReservationRepository {
     /** The signed-in user's reservations, newest first. Empty when signed out. */
     fun myReservations(): Flow<List<Reservation>>
 
-    /** Reservations for one restaurant within a window. Drives availability and admin. */
-    suspend fun reservationsFor(
+    /**
+     * Seats already taken per sitting for one restaurant on one day.
+     *
+     * Reads public aggregates rather than other people's reservations, so availability works
+     * without exposing who else is booked.
+     */
+    suspend fun seatsTakenFor(
         restaurantId: String,
         from: Timestamp,
         to: Timestamp,
-    ): Result<List<Reservation>>
+    ): Result<Map<Long, Int>>
 
     suspend fun create(reservation: Reservation): Result<String>
 

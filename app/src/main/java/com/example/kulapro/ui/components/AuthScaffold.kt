@@ -72,22 +72,6 @@ fun AuthScaffold(
                 ),
         )
 
-        // Sits above the scrolling content so it stays reachable as the form scrolls.
-        onBack?.let {
-            IconButton(
-                onClick = it,
-                modifier = Modifier
-                    .align(Alignment.TopStart)
-                    .padding(8.dp),
-            ) {
-                Icon(
-                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                    contentDescription = "Back",
-                    tint = MaterialTheme.colorScheme.onPrimaryContainer,
-                )
-            }
-        }
-
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -159,6 +143,24 @@ fun AuthScaffold(
 
             Spacer(Modifier.height(32.dp))
         }
+
+        // Drawn after the scrolling column so it sits on top. Declared before it, the
+        // full size column covered the button and swallowed every tap.
+        onBack?.let {
+            IconButton(
+                onClick = it,
+                modifier = Modifier
+                    .align(Alignment.TopStart)
+                    .padding(8.dp),
+            ) {
+                Icon(
+                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                    contentDescription = "Back",
+                    tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                )
+            }
+        }
+
     }
 }
 

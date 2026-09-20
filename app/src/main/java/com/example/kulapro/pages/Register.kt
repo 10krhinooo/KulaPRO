@@ -10,8 +10,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Email
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SnackbarHost
-import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -31,8 +29,10 @@ import com.example.kulapro.data.repository.Result
 import com.example.kulapro.ui.components.AuthScaffold
 import com.example.kulapro.ui.components.KulaPasswordField
 import com.example.kulapro.ui.components.KulaTextField
+import com.example.kulapro.ui.components.MessageHost
 import com.example.kulapro.ui.components.PasswordStrengthMeter
 import com.example.kulapro.ui.components.PrimaryButton
+import com.example.kulapro.ui.components.rememberMessageHostState
 import com.example.kulapro.ui.components.shakeOnError
 import com.example.kulapro.util.Validators
 import kotlinx.coroutines.launch
@@ -45,7 +45,7 @@ fun RegisterPage(
     authRepository: AuthRepository = remember { AuthRepositoryFirebase(appContext) },
 ) {
     val scope = rememberCoroutineScope()
-    val snackbarHostState = remember { SnackbarHostState() }
+    val messages = rememberMessageHostState()
     val context = LocalContext.current
 
     var email by remember { mutableStateOf("") }
@@ -76,7 +76,7 @@ fun RegisterPage(
 
                 is Result.Failure -> {
                     errorNonce = (errorNonce ?: 0) + 1
-                    snackbarHostState.showSnackbar(result.message)
+                    messages.showError(result.message)
                 }
             }
         }
@@ -87,7 +87,7 @@ fun RegisterPage(
         // Insets are owned by the navigation Scaffold; applying them again here would
         // double count the navigation bar height.
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
-        snackbarHost = { SnackbarHost(snackbarHostState) },
+        snackbarHost = { MessageHost(messages) },
     ) { padding ->
         Box(Modifier.padding(padding)) {
             AuthScaffold(
@@ -161,7 +161,7 @@ fun RegisterPage(
                                 }
 
                                 is Result.Failure ->
-                                    snackbarHostState.showSnackbar(result.message)
+                                    messages.showError(result.message)
                             }
                         }
                     },

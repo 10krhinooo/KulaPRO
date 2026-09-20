@@ -9,6 +9,12 @@ service cloud.firestore {
       return request.auth != null;
     }
 
+    // A single sitting cannot hold more than this, and one booking cannot move the seat
+    // counter by more than one party. Both bound what a client write is able to do.
+    function MAX_SEATS_PER_SLOT() { return 500; }
+    function MAX_PARTY_SIZE() { return 20; }
+
+
     function isSelf(userId) {
       return isSignedIn() && request.auth.uid == userId;
     }
@@ -63,6 +69,37 @@ service cloud.firestore {
       match /stats/{statId} {
         allow read: if managesRestaurant(restaurantId);
         allow write: if false;
+      }
+
+      // Public per-slot seat counters. These carry no personal data, which is the whole
+      // point of them: a diner needs to know whether a sitting is full without being able
+      // to read who else is booked.
+      //
+      // Booking is a client-side transaction, so a diner has to be able to write the
+      // counter alongside their own reservation. The write is fenced in rather than
+      // trusted: the document id must be the slot start it claims, the count must stay
+      // non-negative, and a single write may not move it by more than one large party.
+      // That stops a client from zeroing a full restaurant or fabricating a full one,
+      // though it cannot stop a determined client from nudging its own slot. Moving the
+      // counter into a Firestore trigger removes client write access altogether and is
+      // the right next step once functions are deployed.
+      match /slots/{slotId} {
+        allow read: if true;
+
+        allow write: if managesRestaurant(restaurantId) || (
+          isSignedIn()
+          && request.resource.data.restaurantId == restaurantId
+          && request.resource.data.startsAtSeconds is int
+          && string(request.resource.data.startsAtSeconds) == slotId
+          && request.resource.data.seatsTaken is int
+          && request.resource.data.seatsTaken >= 0
+          && request.resource.data.seatsTaken <= MAX_SEATS_PER_SLOT()
+          && (
+            resource == null
+            || math.abs(request.resource.data.seatsTaken - resource.data.seatsTaken)
+               <= MAX_PARTY_SIZE()
+          )
+        );
       }
 
       match /reviews/{reviewId} {

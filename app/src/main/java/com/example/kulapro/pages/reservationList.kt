@@ -1,16 +1,16 @@
 package com.example.kulapro.pages
 
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.EventNote
 import androidx.compose.material3.Card
@@ -19,8 +19,6 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SnackbarHost
-import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -40,18 +38,21 @@ import com.example.kulapro.data.model.ReservationStatus
 import com.example.kulapro.data.model.Review
 import com.example.kulapro.data.repository.ReservationRepository
 import com.example.kulapro.data.repository.ReservationRepositoryFirestore
+import com.example.kulapro.data.repository.Result
 import com.example.kulapro.data.repository.ReviewRepository
 import com.example.kulapro.data.repository.ReviewRepositoryFirestore
-import com.example.kulapro.data.repository.Result
 import com.example.kulapro.ui.components.AnimatedListItem
 import com.example.kulapro.ui.components.EmptyState
+import com.example.kulapro.ui.components.MessageHost
 import com.example.kulapro.ui.components.RestaurantCardSkeleton
 import com.example.kulapro.ui.components.ReviewDialog
 import com.example.kulapro.ui.components.SignInPrompt
 import com.example.kulapro.ui.components.StatusBadge
-import kotlinx.coroutines.launch
+import com.example.kulapro.ui.components.rememberMessageHostState
+import com.example.kulapro.ui.components.report
 import java.text.SimpleDateFormat
 import java.util.Locale
+import kotlinx.coroutines.launch
 
 /**
  * The user's reservations, read from Firestore.
@@ -69,7 +70,7 @@ fun ReservationScreen(
     reviewRepository: ReviewRepository = remember { ReviewRepositoryFirestore() },
 ) {
     val scope = rememberCoroutineScope()
-    val snackbarHostState = remember { SnackbarHostState() }
+    val messages = rememberMessageHostState()
     var isLoading by remember { mutableStateOf(true) }
     var reviewTarget by remember { mutableStateOf<Reservation?>(null) }
     var isPostingReview by remember { mutableStateOf(false) }
@@ -99,12 +100,7 @@ fun ReservationScreen(
                     )
                     isPostingReview = false
                     reviewTarget = null
-                    snackbarHostState.showSnackbar(
-                        when (result) {
-                            is Result.Success -> "Thanks, your review is live"
-                            is Result.Failure -> result.message
-                        },
-                    )
+                    messages.report(result, "Thanks, your review is live")
                 }
             },
         )
@@ -116,7 +112,7 @@ fun ReservationScreen(
         // double count the navigation bar height.
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
         topBar = { TopAppBar(title = { Text("Your reservations") }) },
-        snackbarHost = { SnackbarHost(snackbarHostState) },
+        snackbarHost = { MessageHost(messages) },
     ) { padding ->
         Box(
             modifier = Modifier
@@ -161,10 +157,10 @@ fun ReservationScreen(
                                 scope.launch {
                                     when (val result = repository.cancel(reservation.id)) {
                                         is Result.Success ->
-                                            snackbarHostState.showSnackbar("Reservation cancelled")
+                                            messages.showSuccess("Reservation cancelled")
 
                                         is Result.Failure ->
-                                            snackbarHostState.showSnackbar(result.message)
+                                            messages.showError(result.message)
                                     }
                                 }
                             },

@@ -13,6 +13,9 @@ object Routes {
     const val SETTINGS = "settings"
     const val ABOUT = "about"
     const val OWNER = "owner/{restaurantId}"
+    const val RESTAURANT = "restaurant/{restaurantId}"
+
+    fun restaurant(restaurantId: String): String = "restaurant/$restaurantId"
 
     fun owner(restaurantId: String): String = "owner/$restaurantId"
 

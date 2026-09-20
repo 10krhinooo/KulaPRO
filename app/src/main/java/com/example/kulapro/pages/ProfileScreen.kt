@@ -11,10 +11,10 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -33,8 +33,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SnackbarHost
-import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -47,8 +45,8 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -59,11 +57,14 @@ import com.example.kulapro.data.repository.AuthRepositoryFirebase
 import com.example.kulapro.data.repository.ProfileRepository
 import com.example.kulapro.data.repository.Result
 import com.example.kulapro.ui.components.KulaPasswordField
-import com.example.kulapro.ui.components.ProfileAvatar
-import com.example.kulapro.ui.components.SignInPrompt
 import com.example.kulapro.ui.components.KulaTextField
+import com.example.kulapro.ui.components.MessageHost
 import com.example.kulapro.ui.components.PrimaryButton
+import com.example.kulapro.ui.components.ProfileAvatar
 import com.example.kulapro.ui.components.SecondaryButton
+import com.example.kulapro.ui.components.SignInPrompt
+import com.example.kulapro.ui.components.rememberMessageHostState
+import com.example.kulapro.ui.components.report
 import com.example.kulapro.ui.theme.Motion
 import com.example.kulapro.util.Validators
 import kotlinx.coroutines.launch
@@ -87,8 +88,12 @@ fun ProfilePage(
     profileRepository: ProfileRepository = authRepository as ProfileRepository,
 ) {
     val scope = rememberCoroutineScope()
-    val snackbarHostState = remember { SnackbarHostState() }
-    val email = authRepository.currentUserEmail
+    val messages = rememberMessageHostState()
+    // Collected rather than read once, so signing out immediately returns this screen to
+    // its guest state instead of showing a stale account.
+    val signedInUserId by authRepository.authState()
+        .collectAsStateWithLifecycle(initialValue = authRepository.currentUserId)
+    val email = signedInUserId?.let { authRepository.currentUserEmail }
 
     var expandedSection by remember { mutableStateOf<String?>(null) }
     var isBusy by remember { mutableStateOf(false) }
@@ -107,7 +112,7 @@ fun ProfilePage(
             val result = profileRepository.updateProfilePhoto(uri)
             isUploadingPhoto = false
             if (result is Result.Failure) {
-                snackbarHostState.showSnackbar(result.message)
+                messages.showError(result.message)
             }
         }
     }
@@ -127,7 +132,7 @@ fun ProfilePage(
                 },
             )
         },
-        snackbarHost = { SnackbarHost(snackbarHostState) },
+        snackbarHost = { MessageHost(messages) },
     ) { padding ->
         if (email == null) {
             Box(
@@ -184,7 +189,7 @@ fun ProfilePage(
                             val result = profileRepository.removeProfilePhoto()
                             isUploadingPhoto = false
                             if (result is Result.Failure) {
-                                snackbarHostState.showSnackbar(result.message)
+                                messages.showError(result.message)
                             }
                         }
                     },
@@ -210,12 +215,7 @@ fun ProfilePage(
                         scope.launch {
                             val result = profileRepository.updateProfileDetails(name, phone)
                             isBusy = false
-                            snackbarHostState.showSnackbar(
-                                when (result) {
-                                    is Result.Success -> "Details saved"
-                                    is Result.Failure -> result.message
-                                },
-                            )
+                            messages.report(result, "Details saved")
                             if (result is Result.Success) expandedSection = null
                         }
                     },
@@ -238,13 +238,11 @@ fun ProfilePage(
                         scope.launch {
                             val result = authRepository.updateEmail(newEmail, currentPassword)
                             isBusy = false
-                            snackbarHostState.showSnackbar(
-                                when (result) {
-                                    // The address only changes once the new inbox is
-                                    // confirmed, so do not claim it already has.
-                                    is Result.Success -> "Check $newEmail to confirm the change"
-                                    is Result.Failure -> result.message
-                                },
+                            // The address only changes once the new inbox is confirmed,
+                            // so do not claim it already has.
+                            messages.report(
+                                result,
+                                "Check $newEmail to confirm the change",
                             )
                             if (result is Result.Success) expandedSection = null
                         }
@@ -270,12 +268,7 @@ fun ProfilePage(
                             val result =
                                 authRepository.updatePassword(newPassword, currentPassword)
                             isBusy = false
-                            snackbarHostState.showSnackbar(
-                                when (result) {
-                                    is Result.Success -> "Password changed"
-                                    is Result.Failure -> result.message
-                                },
-                            )
+                            messages.report(result, "Password changed")
                             if (result is Result.Success) expandedSection = null
                         }
                     },

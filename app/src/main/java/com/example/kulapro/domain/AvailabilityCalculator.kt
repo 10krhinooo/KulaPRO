@@ -1,6 +1,5 @@
 package com.example.kulapro.domain
 
-import com.example.kulapro.data.model.Reservation
 import com.example.kulapro.data.model.Restaurant
 import java.util.Calendar
 import java.util.Date
@@ -17,6 +16,7 @@ object AvailabilityCalculator {
 
     private const val HOURS_PER_DAY = 24
     private const val MINUTES_PER_HOUR = 60
+    private const val MILLIS_PER_SECOND = 1000
 
     data class Slot(
         val label: String,
@@ -27,23 +27,20 @@ object AvailabilityCalculator {
     }
 
     /**
-     * @param existing reservations already held for [restaurant] on [day]. Only statuses that
-     *   occupy capacity are counted, so a cancellation frees its seats again.
+     * @param seatsTaken seats already booked, keyed by slot start in epoch seconds. Read from
+     *   public per slot counters rather than from other people's reservations, so a diner
+     *   never needs permission to see who else is booked.
      */
     fun slotsFor(
         restaurant: Restaurant,
         day: Date,
-        existing: List<Reservation>,
+        seatsTaken: Map<Long, Int>,
         partySize: Int,
     ): List<Slot> {
         val hours = openingHoursFor(restaurant, day) ?: return emptyList()
-        val taken = existing
-            .filter { it.statusEnum.occupiesCapacity }
-            .groupBy { startOfSlot(it.startsAt.toDate(), restaurant.slotDurationMinutes) }
-            .mapValues { (_, reservations) -> reservations.sumOf { it.partySize } }
 
         return generateSlots(day, hours, restaurant.slotDurationMinutes).map { start ->
-            val used = taken[startOfSlot(start, restaurant.slotDurationMinutes)] ?: 0
+            val used = seatsTaken[start.time / MILLIS_PER_SECOND] ?: 0
             val remaining = (restaurant.capacityPerSlot - used).coerceAtLeast(0)
             Slot(
                 label = formatTime(start),
@@ -110,21 +107,6 @@ object AvailabilityCalculator {
             set(Calendar.SECOND, 0)
             set(Calendar.MILLISECOND, 0)
         }.time
-
-    private fun startOfSlot(date: Date, durationMinutes: Int): Long {
-        if (durationMinutes <= 0) return date.time
-        val calendar = Calendar.getInstance().apply {
-            time = date
-            set(Calendar.SECOND, 0)
-            set(Calendar.MILLISECOND, 0)
-        }
-        val minuteOfDay = calendar.get(Calendar.HOUR_OF_DAY) * MINUTES_PER_HOUR +
-            calendar.get(Calendar.MINUTE)
-        val aligned = (minuteOfDay / durationMinutes) * durationMinutes
-        calendar.set(Calendar.HOUR_OF_DAY, aligned / MINUTES_PER_HOUR)
-        calendar.set(Calendar.MINUTE, aligned % MINUTES_PER_HOUR)
-        return calendar.timeInMillis
-    }
 
     private fun formatTime(date: Date): String {
         val calendar = Calendar.getInstance().apply { time = date }

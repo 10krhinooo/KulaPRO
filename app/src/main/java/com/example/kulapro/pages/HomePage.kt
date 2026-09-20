@@ -1,9 +1,9 @@
 package com.example.kulapro.pages
 
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
@@ -28,14 +28,18 @@ import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
 import com.example.kulapro.Routes
 import com.example.kulapro.data.model.Restaurant
-import com.example.kulapro.feature.owner.Portal
-import com.example.kulapro.feature.owner.PortalSwitcher
+import com.example.kulapro.data.model.UserProfile
+import com.example.kulapro.data.repository.AuthRepositoryFirebase
+import com.example.kulapro.data.repository.ProfileRepository
 import com.example.kulapro.data.repository.RestaurantRepository
 import com.example.kulapro.data.repository.RestaurantRepositoryFirestore
+import com.example.kulapro.feature.owner.Portal
+import com.example.kulapro.feature.owner.PortalSwitcher
 import com.example.kulapro.ui.components.AnimatedListItem
 import com.example.kulapro.ui.components.EmptyState
 import com.example.kulapro.ui.components.RestaurantCard
@@ -45,11 +49,14 @@ import com.example.kulapro.ui.components.RestaurantCardSkeleton
 @Composable
 fun HomePage(
     navController: NavController,
-    onBook: (restaurantId: String, restaurantName: String) -> Unit,
+    onOpenRestaurant: (restaurantId: String) -> Unit,
     onSwitchToHosting: (String) -> Unit,
     modifier: Modifier = Modifier,
+    isSignedIn: Boolean = false,
     managedRestaurantId: String? = null,
     repository: RestaurantRepository = remember { RestaurantRepositoryFirestore() },
+    appContext: android.content.Context = LocalContext.current.applicationContext,
+    profileRepository: ProfileRepository = remember { AuthRepositoryFirebase(appContext) },
 ) {
     var isLoading by remember { mutableStateOf(true) }
 
@@ -59,6 +66,14 @@ fun HomePage(
             isLoading = false
         }
     }
+
+    // Greet the user by name once we know it. A guest is never asked who they are, so the
+    // heading falls back to the question rather than to an empty "Hello ,".
+    val profile by produceState<UserProfile?>(null, isSignedIn) {
+        value = null
+        if (isSignedIn) profileRepository.profileFlow().collect { value = it }
+    }
+    val firstName = profile?.displayName.orEmpty().trim().substringBefore(' ')
 
     Scaffold(
         modifier = modifier,
@@ -97,11 +112,24 @@ fun HomePage(
                 .fillMaxSize()
                 .padding(padding),
         ) {
-            Text(
-                text = "Where are you eating?",
-                style = MaterialTheme.typography.headlineMedium,
-                modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 8.dp),
-            )
+            if (firstName.isNotBlank()) {
+                Text(
+                    text = "Hello $firstName",
+                    style = MaterialTheme.typography.headlineMedium,
+                    modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 8.dp),
+                )
+                Text(
+                    text = "Where are you eating?",
+                    style = MaterialTheme.typography.titleMedium,
+                    modifier = Modifier.padding(horizontal = 16.dp),
+                )
+            } else {
+                Text(
+                    text = "Where are you eating?",
+                    style = MaterialTheme.typography.headlineMedium,
+                    modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 8.dp),
+                )
+            }
             Text(
                 text = "Real tables, real times, booked in seconds.",
                 style = MaterialTheme.typography.bodyMedium,
@@ -133,7 +161,7 @@ fun HomePage(
                         AnimatedListItem(index = index) {
                             RestaurantCard(
                                 restaurant = restaurant,
-                                onClick = { onBook(restaurant.id, restaurant.name) },
+                                onClick = { onOpenRestaurant(restaurant.id) },
                             )
                         }
                     }

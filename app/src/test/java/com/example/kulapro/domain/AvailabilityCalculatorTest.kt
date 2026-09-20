@@ -1,9 +1,6 @@
 package com.example.kulapro.domain
 
-import com.example.kulapro.data.model.Reservation
-import com.example.kulapro.data.model.ReservationStatus
 import com.example.kulapro.data.model.Restaurant
-import com.google.firebase.Timestamp
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -31,27 +28,24 @@ class AvailabilityCalculatorTest {
         openingHours = hours,
     )
 
-    private fun reservationAt(hour: Int, minute: Int, party: Int, status: ReservationStatus) =
-        Reservation(
-            id = "res-$hour-$minute-$party",
-            restaurantId = "r1",
-            partySize = party,
-            status = status.name,
-            startsAt = Timestamp(
-                Calendar.getInstance().apply {
-                    time = wednesday()
-                    set(Calendar.HOUR_OF_DAY, hour)
-                    set(Calendar.MINUTE, minute)
-                }.time,
-            ),
-        )
+    /** Seats taken at a given time, keyed the way the slot counters are. */
+    private fun takenAt(hour: Int, minute: Int, seats: Int): Pair<Long, Int> {
+        val time = Calendar.getInstance().apply {
+            time = wednesday()
+            set(Calendar.HOUR_OF_DAY, hour)
+            set(Calendar.MINUTE, minute)
+            set(Calendar.SECOND, 0)
+            set(Calendar.MILLISECOND, 0)
+        }.timeInMillis
+        return (time / 1000) to seats
+    }
 
     @Test
     fun `generates one slot per interval within opening hours`() {
         val slots = AvailabilityCalculator.slotsFor(
             restaurant = restaurant(),
             day = wednesday(),
-            existing = emptyList(),
+            seatsTaken = emptyMap(),
             partySize = 2,
         )
         // 12:00-15:00 at 60 minutes yields 12:00, 13:00, 14:00. The 15:00 seating would run
@@ -64,7 +58,7 @@ class AvailabilityCalculatorTest {
         val slots = AvailabilityCalculator.slotsFor(
             restaurant = restaurant(hours = mapOf("monday" to "12:00-15:00")),
             day = wednesday(),
-            existing = emptyList(),
+            seatsTaken = emptyMap(),
             partySize = 2,
         )
         assertTrue(slots.isEmpty())
@@ -75,7 +69,7 @@ class AvailabilityCalculatorTest {
         val slots = AvailabilityCalculator.slotsFor(
             restaurant = restaurant(capacity = 10),
             day = wednesday(),
-            existing = listOf(reservationAt(13, 0, 4, ReservationStatus.CONFIRMED)),
+            seatsTaken = mapOf(takenAt(13, 0, 4)),
             partySize = 2,
         )
         assertEquals(10, slots.first { it.label == "12:00 PM" }.seatsRemaining)
@@ -88,21 +82,19 @@ class AvailabilityCalculatorTest {
         val slots = AvailabilityCalculator.slotsFor(
             restaurant = restaurant(capacity = 4),
             day = wednesday(),
-            existing = listOf(reservationAt(12, 0, 4, ReservationStatus.CONFIRMED)),
+            seatsTaken = mapOf(takenAt(12, 0, 4)),
             partySize = 1,
         )
         assertFalse(slots.first { it.label == "12:00 PM" }.isAvailable)
     }
 
     @Test
-    fun `cancelled bookings free their seats again`() {
+    fun `an empty counter leaves every slot open`() {
         val slots = AvailabilityCalculator.slotsFor(
             restaurant = restaurant(capacity = 4),
             day = wednesday(),
-            existing = listOf(
-                reservationAt(12, 0, 4, ReservationStatus.CANCELLED),
-                reservationAt(13, 0, 4, ReservationStatus.NO_SHOW),
-            ),
+            // Cancelled bookings return their seats to the counter, so nothing is held.
+            seatsTaken = emptyMap(),
             partySize = 2,
         )
         assertTrue(slots.first { it.label == "12:00 PM" }.isAvailable)
@@ -110,12 +102,12 @@ class AvailabilityCalculatorTest {
     }
 
     @Test
-    fun `pending bookings still hold their seats`() {
+    fun `held seats make a slot unavailable`() {
         // A table held but not yet confirmed is not a free table.
         val slots = AvailabilityCalculator.slotsFor(
             restaurant = restaurant(capacity = 4),
             day = wednesday(),
-            existing = listOf(reservationAt(12, 0, 4, ReservationStatus.PENDING)),
+            seatsTaken = mapOf(takenAt(12, 0, 4)),
             partySize = 1,
         )
         assertFalse(slots.first { it.label == "12:00 PM" }.isAvailable)
@@ -126,7 +118,7 @@ class AvailabilityCalculatorTest {
         val slots = AvailabilityCalculator.slotsFor(
             restaurant = restaurant(capacity = 10),
             day = wednesday(),
-            existing = listOf(reservationAt(12, 0, 8, ReservationStatus.CONFIRMED)),
+            seatsTaken = mapOf(takenAt(12, 0, 8)),
             partySize = 4,
         )
         // Two seats remain, which is real capacity but cannot seat a party of four.
@@ -135,12 +127,11 @@ class AvailabilityCalculatorTest {
     }
 
     @Test
-    fun `bookings inside a slot window count against that slot`() {
-        // A 12:30 booking belongs to the 12:00 slot when slots are an hour long.
+    fun `counters are matched to their slot start`() {
         val slots = AvailabilityCalculator.slotsFor(
             restaurant = restaurant(capacity = 6),
             day = wednesday(),
-            existing = listOf(reservationAt(12, 30, 6, ReservationStatus.CONFIRMED)),
+            seatsTaken = mapOf(takenAt(12, 0, 6)),
             partySize = 1,
         )
         assertFalse(slots.first { it.label == "12:00 PM" }.isAvailable)
@@ -152,7 +143,7 @@ class AvailabilityCalculatorTest {
             val slots = AvailabilityCalculator.slotsFor(
                 restaurant = restaurant(hours = mapOf("wednesday" to raw)),
                 day = wednesday(),
-                existing = emptyList(),
+                seatsTaken = emptyMap(),
                 partySize = 2,
             )
             assertTrue("expected no slots for '$raw'", slots.isEmpty())
@@ -164,7 +155,7 @@ class AvailabilityCalculatorTest {
         val slots = AvailabilityCalculator.slotsFor(
             restaurant = restaurant(slotMinutes = 0),
             day = wednesday(),
-            existing = emptyList(),
+            seatsTaken = emptyMap(),
             partySize = 2,
         )
         assertTrue(slots.isEmpty())
@@ -193,7 +184,7 @@ class AvailabilityCalculatorTest {
             val open = AvailabilityCalculator.slotsFor(
                 restaurant = restaurant(hours = mapOf(name to "12:00-14:00")),
                 day = date,
-                existing = emptyList(),
+                seatsTaken = emptyMap(),
                 partySize = 2,
             )
             assertEquals(
@@ -207,7 +198,7 @@ class AvailabilityCalculatorTest {
             val closed = AvailabilityCalculator.slotsFor(
                 restaurant = restaurant(hours = mapOf(other to "12:00-14:00")),
                 day = date,
-                existing = emptyList(),
+                seatsTaken = emptyMap(),
                 partySize = 2,
             )
             assertTrue("$name should be closed under $other hours", closed.isEmpty())
@@ -221,7 +212,7 @@ class AvailabilityCalculatorTest {
         val slots = AvailabilityCalculator.slotsFor(
             restaurant = restaurant(slotMinutes = 0),
             day = wednesday(),
-            existing = listOf(reservationAt(12, 0, 2, ReservationStatus.CONFIRMED)),
+            seatsTaken = mapOf(takenAt(12, 0, 2)),
             partySize = 2,
         )
         assertTrue(slots.isEmpty())
@@ -232,7 +223,7 @@ class AvailabilityCalculatorTest {
         val slots = AvailabilityCalculator.slotsFor(
             restaurant = restaurant(hours = mapOf("wednesday" to "12:00-14:30")),
             day = wednesday(),
-            existing = emptyList(),
+            seatsTaken = emptyMap(),
             partySize = 2,
         )
         // 14:00 would run to 15:00, past a 14:30 close, so it is not offered.
@@ -245,7 +236,7 @@ class AvailabilityCalculatorTest {
             val slots = AvailabilityCalculator.slotsFor(
                 restaurant = restaurant(hours = mapOf("wednesday" to raw)),
                 day = wednesday(),
-                existing = emptyList(),
+                seatsTaken = emptyMap(),
                 partySize = 2,
             )
             assertTrue("expected no slots for '$raw'", slots.isEmpty())
@@ -257,7 +248,7 @@ class AvailabilityCalculatorTest {
         val slots = AvailabilityCalculator.slotsFor(
             restaurant = restaurant(hours = mapOf("wednesday" to "12:00-notatime")),
             day = wednesday(),
-            existing = emptyList(),
+            seatsTaken = emptyMap(),
             partySize = 2,
         )
         assertTrue(slots.isEmpty())
@@ -268,7 +259,7 @@ class AvailabilityCalculatorTest {
         val slots = AvailabilityCalculator.slotsFor(
             restaurant = restaurant(hours = mapOf("wednesday" to "00:00-02:00")),
             day = wednesday(),
-            existing = emptyList(),
+            seatsTaken = emptyMap(),
             partySize = 1,
         )
         assertEquals(listOf("12:00 AM", "1:00 AM"), slots.map { it.label })

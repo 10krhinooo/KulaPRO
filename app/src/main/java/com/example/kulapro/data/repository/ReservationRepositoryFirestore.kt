@@ -2,6 +2,7 @@ package com.example.kulapro.data.repository
 
 import com.example.kulapro.data.model.Reservation
 import com.example.kulapro.data.model.ReservationStatus
+import com.example.kulapro.data.model.SlotCount
 import com.google.firebase.Timestamp
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
@@ -34,18 +35,20 @@ class ReservationRepositoryFirestore(
         }
     }
 
-    override suspend fun reservationsFor(
+    override suspend fun seatsTakenFor(
         restaurantId: String,
         from: Timestamp,
         to: Timestamp,
-    ): Result<List<Reservation>> = runCatchingFirestore {
-        firestore.collection(FirestorePaths.RESERVATIONS)
-            .whereEqualTo("restaurantId", restaurantId)
-            .whereGreaterThanOrEqualTo("startsAt", from)
-            .whereLessThan("startsAt", to)
+    ): Result<Map<Long, Int>> = runCatchingFirestore {
+        firestore.collection(FirestorePaths.RESTAURANTS)
+            .document(restaurantId)
+            .collection(FirestorePaths.SLOTS)
+            .whereGreaterThanOrEqualTo("startsAtSeconds", from.seconds)
+            .whereLessThan("startsAtSeconds", to.seconds)
             .get()
             .await()
-            .toObjects(Reservation::class.java)
+            .toObjects(SlotCount::class.java)
+            .associate { it.startsAtSeconds to it.seatsTaken }
     }
 
     override suspend fun create(reservation: Reservation): Result<String> {
@@ -62,17 +65,58 @@ class ReservationRepositoryFirestore(
                 status = ReservationStatus.PENDING.name,
                 createdAt = Timestamp.now(),
             )
-            document.set(toSave).await()
+            val slot = slotDocument(reservation.restaurantId, reservation.startsAt.seconds)
+
+            // The booking and the seat count move together. A transaction rather than a
+            // batch, because the new count depends on the value read a moment earlier.
+            firestore.runTransaction { transaction ->
+                val current = transaction.get(slot).toObject(SlotCount::class.java)
+                transaction.set(document, toSave)
+                transaction.set(
+                    slot,
+                    SlotCount(
+                        restaurantId = reservation.restaurantId,
+                        startsAtSeconds = reservation.startsAt.seconds,
+                        seatsTaken = (current?.seatsTaken ?: 0) + reservation.partySize,
+                    ),
+                )
+            }.await()
             document.id
         }
     }
 
     override suspend fun cancel(reservationId: String): Result<Unit> = runCatchingFirestore {
-        firestore.collection(FirestorePaths.RESERVATIONS)
+        val reservationRef = firestore.collection(FirestorePaths.RESERVATIONS)
             .document(reservationId)
-            .update("status", ReservationStatus.CANCELLED.name)
-            .await()
+
+        firestore.runTransaction { transaction ->
+            val reservation = transaction.get(reservationRef).toObject(Reservation::class.java)
+                ?: error("Reservation not found")
+            transaction.update(reservationRef, "status", ReservationStatus.CANCELLED.name)
+
+            // Give the seats back, so a cancelled booking stops blocking the slot.
+            if (reservation.statusEnum.occupiesCapacity) {
+                val slot = slotDocument(reservation.restaurantId, reservation.startsAt.seconds)
+                val current = transaction.get(slot).toObject(SlotCount::class.java)
+                transaction.set(
+                    slot,
+                    SlotCount(
+                        restaurantId = reservation.restaurantId,
+                        startsAtSeconds = reservation.startsAt.seconds,
+                        seatsTaken = ((current?.seatsTaken ?: 0) - reservation.partySize)
+                            .coerceAtLeast(0),
+                    ),
+                )
+            }
+        }.await()
     }
+
+    /** Slot documents are keyed by start time, so a booking maps to exactly one counter. */
+    private fun slotDocument(restaurantId: String, startsAtSeconds: Long) =
+        firestore.collection(FirestorePaths.RESTAURANTS)
+            .document(restaurantId)
+            .collection(FirestorePaths.SLOTS)
+            .document(startsAtSeconds.toString())
 }
 
 internal inline fun <T> runCatchingFirestore(block: () -> T): Result<T> = try {

@@ -7,4 +7,5 @@ internal object FirestorePaths {
     const val REVIEWS = "reviews"
     const val RESERVATIONS = "reservations"
     const val USERS = "users"
+    const val SLOTS = "slots"
 }

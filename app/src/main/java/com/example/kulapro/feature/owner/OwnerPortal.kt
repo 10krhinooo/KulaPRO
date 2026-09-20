@@ -11,8 +11,6 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SnackbarHost
-import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
@@ -33,10 +31,12 @@ import com.example.kulapro.data.repository.RestaurantRepository
 import com.example.kulapro.data.repository.RestaurantRepositoryFirestore
 import com.example.kulapro.data.repository.Result
 import com.example.kulapro.ui.components.ErrorState
+import com.example.kulapro.ui.components.MessageHost
+import com.example.kulapro.ui.components.rememberMessageHostState
 import com.google.firebase.Timestamp
-import kotlinx.coroutines.launch
 import java.util.Calendar
 import java.util.Date
+import kotlinx.coroutines.launch
 
 private enum class OwnerScreen { DASHBOARD, EDIT }
 
@@ -56,7 +56,7 @@ fun OwnerPortal(
     ownerRepository: OwnerRepository = remember { OwnerRepositoryFirestore() },
 ) {
     val scope = rememberCoroutineScope()
-    val snackbarHostState = remember { SnackbarHostState() }
+    val messages = rememberMessageHostState()
 
     var screen by remember { mutableStateOf(OwnerScreen.DASHBOARD) }
     var restaurant by remember { mutableStateOf<Restaurant?>(null) }
@@ -110,7 +110,7 @@ fun OwnerPortal(
                 },
             )
         },
-        snackbarHost = { SnackbarHost(snackbarHostState) },
+        snackbarHost = { MessageHost(messages) },
     ) { padding ->
         Box(
             modifier = Modifier
@@ -146,11 +146,11 @@ fun OwnerPortal(
                                 is Result.Success -> {
                                     restaurant = updated
                                     screen = OwnerScreen.DASHBOARD
-                                    snackbarHostState.showSnackbar("Listing updated")
+                                    messages.showSuccess("Listing updated")
                                 }
 
                                 is Result.Failure ->
-                                    snackbarHostState.showSnackbar(result.message)
+                                    messages.showError(result.message)
                             }
                         }
                     },

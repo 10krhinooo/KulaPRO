@@ -1,12 +1,12 @@
 package com.example.kulapro.pages
 
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.fadeIn
 import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -16,8 +16,6 @@ import androidx.compose.material.icons.rounded.Email
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SnackbarHost
-import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -37,8 +35,10 @@ import com.example.kulapro.data.repository.AuthRepositoryFirebase
 import com.example.kulapro.data.repository.Result
 import com.example.kulapro.ui.components.AuthScaffold
 import com.example.kulapro.ui.components.KulaTextField
+import com.example.kulapro.ui.components.MessageHost
 import com.example.kulapro.ui.components.PrimaryButton
 import com.example.kulapro.ui.components.SecondaryButton
+import com.example.kulapro.ui.components.rememberMessageHostState
 import com.example.kulapro.ui.components.shakeOnError
 import com.example.kulapro.util.Validators
 import kotlinx.coroutines.launch
@@ -51,7 +51,7 @@ fun ForgotPasswordScreen(
     authRepository: AuthRepository = remember { AuthRepositoryFirebase(appContext) },
 ) {
     val scope = rememberCoroutineScope()
-    val snackbarHostState = remember { SnackbarHostState() }
+    val messages = rememberMessageHostState()
 
     var email by remember { mutableStateOf("") }
     var emailError by remember { mutableStateOf<String?>(null) }
@@ -64,7 +64,7 @@ fun ForgotPasswordScreen(
         // Insets are owned by the navigation Scaffold; applying them again here would
         // double count the navigation bar height.
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
-        snackbarHost = { SnackbarHost(snackbarHostState) },
+        snackbarHost = { MessageHost(messages) },
     ) { padding ->
         Box(Modifier.padding(padding)) {
             AuthScaffold(
@@ -108,7 +108,7 @@ fun ForgotPasswordScreen(
                                 is Result.Success -> sentTo = target
                                 is Result.Failure -> {
                                     errorNonce = (errorNonce ?: 0) + 1
-                                    snackbarHostState.showSnackbar(result.message)
+                                    messages.showError(result.message)
                                 }
                             }
                         }

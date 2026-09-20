@@ -2,9 +2,9 @@ package com.example.kulapro.pages
 
 import android.app.DatePickerDialog
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -23,8 +23,6 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SnackbarHost
-import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
@@ -47,13 +45,15 @@ import com.example.kulapro.data.repository.RestaurantRepository
 import com.example.kulapro.data.repository.RestaurantRepositoryFirestore
 import com.example.kulapro.data.repository.Result
 import com.example.kulapro.domain.AvailabilityCalculator
+import com.example.kulapro.ui.components.MessageHost
+import com.example.kulapro.ui.components.rememberMessageHostState
 import com.example.kulapro.util.Validators
 import com.google.firebase.Timestamp
-import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
 import java.util.Locale
+import kotlinx.coroutines.launch
 
 /**
  * Booking form.
@@ -75,7 +75,7 @@ fun ReservationFormScreen(
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    val snackbarHostState = remember { SnackbarHostState() }
+    val messages = rememberMessageHostState()
     val dateFormat = remember { SimpleDateFormat("EEE d MMM yyyy", Locale.getDefault()) }
 
     var selectedDate by remember { mutableStateOf<Date?>(null) }
@@ -97,14 +97,14 @@ fun ReservationFormScreen(
         when (val restaurant = restaurantRepository.restaurant(restaurantId)) {
             is Result.Failure -> {
                 slots = emptyList()
-                snackbarHostState.showSnackbar(restaurant.message)
+                messages.showError(restaurant.message)
             }
 
             is Result.Success -> {
                 val dayStart = startOfDay(day)
                 val dayEnd = startOfDay(Date(day.time + DAY_MILLIS))
                 when (
-                    val existing = reservationRepository.reservationsFor(
+                    val taken = reservationRepository.seatsTakenFor(
                         restaurantId = restaurantId,
                         from = Timestamp(dayStart),
                         to = Timestamp(dayEnd),
@@ -112,14 +112,14 @@ fun ReservationFormScreen(
                 ) {
                     is Result.Failure -> {
                         slots = emptyList()
-                        snackbarHostState.showSnackbar(existing.message)
+                        messages.showError(taken.message)
                     }
 
                     is Result.Success -> {
                         slots = AvailabilityCalculator.slotsFor(
                             restaurant = restaurant.data,
                             day = day,
-                            existing = existing.data,
+                            seatsTaken = taken.data,
                             partySize = size,
                         )
                     }
@@ -135,7 +135,7 @@ fun ReservationFormScreen(
         // double count the navigation bar height.
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
         topBar = { TopAppBar(title = { Text(restaurantName.ifBlank { "Book a table" }) }) },
-        snackbarHost = { SnackbarHost(snackbarHostState) },
+        snackbarHost = { MessageHost(messages) },
     ) { padding ->
         Column(
             modifier = Modifier
@@ -228,7 +228,7 @@ fun ReservationFormScreen(
                                 popUpTo("home")
                             }
 
-                            is Result.Failure -> snackbarHostState.showSnackbar(result.message)
+                            is Result.Failure -> messages.showError(result.message)
                         }
                     }
                 },

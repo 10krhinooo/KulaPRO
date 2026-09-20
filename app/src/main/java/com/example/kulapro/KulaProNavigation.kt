@@ -19,6 +19,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -46,9 +47,11 @@ import com.example.kulapro.pages.HomePage
 import com.example.kulapro.pages.LoginPage
 import com.example.kulapro.pages.ProfilePage
 import com.example.kulapro.pages.RegisterPage
+import com.example.kulapro.pages.RestaurantDetailScreen
 import com.example.kulapro.pages.ReservationFormScreen
 import com.example.kulapro.pages.ReservationScreen
 import com.example.kulapro.pages.SettingsScreen
+import com.example.kulapro.ui.components.SignInRequiredDialog
 import com.example.kulapro.ui.theme.LocalReduceMotion
 import com.example.kulapro.ui.theme.Motion
 import java.net.URLDecoder
@@ -77,17 +80,45 @@ fun KulaProNavigation(
 
     // Ownership comes from signed Auth claims, refreshed when the signed-in user changes so
     // a newly granted restaurant appears without reinstalling the app.
-    val signedInUserId = authRepository.currentUserId
+    val signedInUserId by authRepository.authState()
+        .collectAsStateWithLifecycle(initialValue = authRepository.currentUserId)
     var managedRestaurants by remember { mutableStateOf<List<String>>(emptyList()) }
     LaunchedEffect(signedInUserId) {
-        managedRestaurants = when (val result = authRepository.managedRestaurantIds(true)) {
-            is Result.Success -> result.data
-            is Result.Failure -> emptyList()
+        managedRestaurants = if (signedInUserId == null) {
+            emptyList()
+        } else {
+            when (val result = authRepository.managedRestaurantIds(true)) {
+                is Result.Success -> result.data
+                is Result.Failure -> emptyList()
+            }
+        }
+    }
+
+    // What the user reached for, held until they decide whether to sign in. Guests browse
+    // freely, so the gate belongs at the action rather than at the front door.
+    var pendingAction by remember { mutableStateOf<GatedAction?>(null) }
+
+    fun requireSignIn(action: String, destination: String) {
+        if (signedInUserId == null) {
+            pendingAction = GatedAction(action = action, destination = destination)
+        } else {
+            navController.navigate(destination)
         }
     }
 
     val backStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = backStackEntry?.destination?.route
+
+    pendingAction?.let { gated ->
+        SignInRequiredDialog(
+            action = gated.action,
+            onDismiss = { pendingAction = null },
+            onSignIn = {
+                pendingAction = null
+                navController.navigate(Routes.login(next = gated.destination))
+            },
+        )
+    }
 
     Scaffold(
         modifier = modifier,
@@ -164,23 +195,42 @@ fun KulaProNavigation(
             composable(Routes.HOME) {
                 HomePage(
                     navController = navController,
+                    isSignedIn = signedInUserId != null,
                     managedRestaurantId = managedRestaurants.firstOrNull(),
                     onSwitchToHosting = { restaurantId ->
                         navController.navigate(Routes.owner(restaurantId))
                     },
-                    onBook = { restaurantId, restaurantName ->
-                        val destination = Routes.reservationForm(restaurantId, restaurantName)
-                        if (authRepository.currentUserId == null) {
-                            navController.navigate(Routes.login(next = destination))
-                        } else {
-                            navController.navigate(destination)
-                        }
+                    onOpenRestaurant = { restaurantId ->
+                        navController.navigate(Routes.restaurant(restaurantId))
                     },
+                )
+            }
+
+            composable(
+                route = Routes.RESTAURANT,
+                arguments = listOf(navArgument("restaurantId") { type = NavType.StringType }),
+            ) { entry ->
+                RestaurantDetailScreen(
+                    restaurantId = entry.arguments?.getString("restaurantId").orEmpty(),
+                    onBack = { navController.popBackStack() },
+                    onBook = { restaurantId, restaurantName ->
+                        requireSignIn(
+                            action = "book a table",
+                            destination = Routes.reservationForm(restaurantId, restaurantName),
+                        )
+                    },
+                    onReview = {
+                        requireSignIn(
+                            action = "leave a review",
+                            destination = Routes.RESERVATIONS,
+                        )
+                    },
+                    isSignedIn = signedInUserId != null,
                 )
             }
             composable(Routes.RESERVATIONS) {
                 ReservationScreen(
-                    isSignedIn = authRepository.currentUserId != null,
+                    isSignedIn = signedInUserId != null,
                     onSignIn = {
                         navController.navigate(Routes.login(next = Routes.RESERVATIONS))
                     },
@@ -280,3 +330,6 @@ private fun BottomNavigationBar(navController: NavController, currentRoute: Stri
         }
     }
 }
+
+/** An action a guest reached for, and where to send them once they have signed in. */
+private data class GatedAction(val action: String, val destination: String)
