@@ -8,6 +8,8 @@ import com.example.kulapro.data.model.RestaurantTable
 import com.example.kulapro.data.repository.ReservationRepository
 import com.example.kulapro.data.repository.RestaurantRepository
 import com.example.kulapro.data.repository.Result
+import com.example.kulapro.data.settings.SettingsRepository
+import com.example.kulapro.feature.reminders.BookingReminderScheduler
 import com.example.kulapro.domain.AvailabilityCalculator
 import com.example.kulapro.ui.components.UiMessage
 import com.google.firebase.Timestamp
@@ -21,6 +23,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
@@ -36,6 +39,8 @@ import kotlinx.coroutines.launch
 class BookingViewModel @Inject constructor(
     private val reservationRepository: ReservationRepository,
     private val restaurantRepository: RestaurantRepository,
+    private val reminderScheduler: BookingReminderScheduler,
+    private val settingsRepository: SettingsRepository,
     savedStateHandle: SavedStateHandle,
 ) : ViewModel() {
 
@@ -120,13 +125,27 @@ class BookingViewModel @Inject constructor(
                     tableLabel = current.selectedTable?.label.orEmpty(),
                 ),
             )
+            val whenLabel = "${summaryFormat.format(day)} at ${slot.label}"
+            if (result is Result.Success) {
+                // Scheduled here rather than in the repository: a reminder is a thing this
+                // device does for this user, not part of writing the booking down.
+                val settings = settingsRepository.settings.first()
+                reminderScheduler.schedule(
+                    reservationId = result.data,
+                    restaurantName = restaurantName,
+                    whenLabel = slot.label,
+                    startsAtMillis = slot.startsAt.time,
+                    leadHours = settings.reminderLeadHours,
+                    enabled = settings.remindersEnabled,
+                )
+            }
             _state.update {
                 when (result) {
                     // Confirmed only once the write lands. The first version navigated away
                     // unconditionally, so a failed write still looked like a booking.
                     is Result.Success -> it.copy(
                         isSubmitting = false,
-                        confirmedLabel = "${summaryFormat.format(day)} at ${slot.label}",
+                        confirmedLabel = whenLabel,
                     )
 
                     is Result.Failure -> it.copy(

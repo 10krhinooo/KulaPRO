@@ -89,7 +89,6 @@ fun KulaProTheme(
         darkTheme -> DarkColors
         else -> LightColors
     }
-
     CompositionLocalProvider(LocalReduceMotion provides rememberSystemReduceMotion()) {
         MaterialTheme(
             colorScheme = colorScheme,

@@ -307,6 +307,7 @@ fun KulaProNavigation(
             composable(Routes.SETTINGS) {
                 SettingsScreen(
                     navController = navController,
+                    isSignedIn = signedInUserId != null,
                     onSignOut = {
                         authRepository.signOut()
                         // Back to browsing, not to a sign-in wall. Sending a signed out user

@@ -109,6 +109,12 @@ dependencies {
     implementation(libs.androidx.hilt.navigation.compose)
     ksp(libs.hilt.compiler)
 
+    // Settings that survive a reinstall, and reminders that fire without a server.
+    implementation(libs.androidx.datastore.preferences)
+    implementation(libs.androidx.work.runtime.ktx)
+    implementation(libs.androidx.hilt.work)
+    ksp(libs.androidx.hilt.compiler)
+
     // Firebase - the BOM governs every version below it
     implementation(platform(libs.firebase.bom))
     implementation(libs.firebase.auth)
@@ -173,6 +179,8 @@ kover {
                     // composables, where it could not be tested. Gating them is the whole
                     // reason for lifting it out.
                     "com.example.kulapro.feature.*ViewModel",
+                    "com.example.kulapro.feature.reminders.BookingReminder",
+                    "com.example.kulapro.data.settings.*",
                     "com.example.kulapro.feature.*UiState*",
                     "com.example.kulapro.feature.*UiStateKt",
                 )

@@ -3,7 +3,9 @@ package com.example.kulapro.feature.booking
 import androidx.lifecycle.SavedStateHandle
 import com.example.kulapro.data.model.Restaurant
 import com.example.kulapro.data.model.RestaurantTable
+import com.example.kulapro.data.settings.FakeSettingsRepository
 import com.example.kulapro.data.model.SlotCount
+import io.mockk.mockk
 import java.util.Calendar
 import java.util.Date
 import kotlinx.coroutines.Dispatchers
@@ -28,6 +30,7 @@ class BookingViewModelTest {
     private val dispatcher = StandardTestDispatcher()
     private lateinit var restaurants: FakeRestaurantRepository
     private lateinit var reservations: FakeReservationRepository
+    private lateinit var settings: FakeSettingsRepository
 
     private val openAllHours = mapOf(
         "monday" to "00:00-23:59", "tuesday" to "00:00-23:59",
@@ -49,6 +52,7 @@ class BookingViewModelTest {
             ),
         )
         reservations = FakeReservationRepository()
+        settings = FakeSettingsRepository()
     }
 
     @After
@@ -57,6 +61,10 @@ class BookingViewModelTest {
     private fun viewModel() = BookingViewModel(
         reservationRepository = reservations,
         restaurantRepository = restaurants,
+        // A real scheduler over a real WorkManager, which the unit test environment has no
+        // business starting. Scheduling is covered by BookingReminderTest instead.
+        reminderScheduler = mockk(relaxed = true),
+        settingsRepository = settings,
         savedStateHandle = SavedStateHandle(
             mapOf(
                 BookingViewModel.ARG_RESTAURANT_ID to "r1",
