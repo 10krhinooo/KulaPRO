@@ -67,6 +67,7 @@ import com.example.kulapro.ui.components.SecondaryButton
 import com.example.kulapro.ui.components.ShimmerBox
 import com.example.kulapro.ui.components.cuisinePhoto
 import com.example.kulapro.ui.components.rememberMessageHostState
+import com.example.kulapro.util.openDialer
 import com.example.kulapro.util.openMapPin
 import java.text.DateFormat
 import java.text.NumberFormat
@@ -188,6 +189,12 @@ fun RestaurantDetailScreen(
                             messages.showError(
                                 "There is no map app on this device to open that in. The " +
                                     "address is above if you want to copy it.",
+                            )
+                        },
+                        onCannotDial = {
+                            messages.showError(
+                                "This device cannot make calls. The number is above if " +
+                                    "you want to ring from another phone.",
                             )
                         },
                     )
@@ -364,7 +371,11 @@ private fun DetailSummary(restaurant: Restaurant) {
 }
 
 @Composable
-private fun RestaurantFacts(restaurant: Restaurant, onNoMapApp: () -> Unit) {
+private fun RestaurantFacts(
+    restaurant: Restaurant,
+    onNoMapApp: () -> Unit,
+    onCannotDial: () -> Unit,
+) {
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         if (restaurant.address.isNotBlank() || restaurant.location != null) {
             val context = LocalContext.current
@@ -387,7 +398,19 @@ private fun RestaurantFacts(restaurant: Restaurant, onNoMapApp: () -> Unit) {
             )
         }
         if (restaurant.phone.isNotBlank()) {
-            Fact(Icons.Rounded.Call, restaurant.phone)
+            val context = LocalContext.current
+            Fact(
+                icon = Icons.Rounded.Call,
+                text = restaurant.phone,
+                actionLabel = "Call",
+                // Fills in the dialer rather than placing the call, so the user is the one
+                // who decides to ring a restaurant.
+                onClick = {
+                    if (!openDialer(context, restaurant.phone)) {
+                        onCannotDial()
+                    }
+                },
+            )
         }
         Fact(
             Icons.Rounded.CalendarToday,
@@ -422,6 +445,7 @@ private fun RestaurantFacts(restaurant: Restaurant, onNoMapApp: () -> Unit) {
 private fun Fact(
     icon: androidx.compose.ui.graphics.vector.ImageVector,
     text: String,
+    actionLabel: String = "Directions",
     onClick: (() -> Unit)? = null,
 ) {
     Row(
@@ -448,7 +472,7 @@ private fun Fact(
         // label and a label never looks tappable.
         if (onClick != null) {
             Text(
-                text = "Directions",
+                text = actionLabel,
                 style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.primary,
             )
