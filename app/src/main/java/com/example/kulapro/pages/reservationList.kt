@@ -198,8 +198,16 @@ private fun ReservationItem(
                 style = MaterialTheme.typography.bodyMedium,
             )
             Text(
-                text = "${reservation.partySize} " +
-                    if (reservation.partySize == 1) "guest" else "guests",
+                text = buildString {
+                    append(reservation.partySize)
+                    append(if (reservation.partySize == 1) " guest" else " guests")
+                    // Only shown when a table was actually chosen; a booking without one is
+                    // seated on arrival and saying "table " would be a lie.
+                    if (reservation.tableLabel.isNotBlank()) {
+                        append(" at table ")
+                        append(reservation.tableLabel)
+                    }
+                },
                 style = MaterialTheme.typography.bodyMedium,
             )
             StatusBadge(status = status, modifier = Modifier.padding(top = 4.dp))

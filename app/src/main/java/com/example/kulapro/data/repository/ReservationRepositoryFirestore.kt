@@ -35,11 +35,11 @@ class ReservationRepositoryFirestore(
         }
     }
 
-    override suspend fun seatsTakenFor(
+    override suspend fun slotCountsFor(
         restaurantId: String,
         from: Timestamp,
         to: Timestamp,
-    ): Result<Map<Long, Int>> = runCatchingFirestore {
+    ): Result<Map<Long, SlotCount>> = runCatchingFirestore {
         firestore.collection(FirestorePaths.RESTAURANTS)
             .document(restaurantId)
             .collection(FirestorePaths.SLOTS)
@@ -48,7 +48,7 @@ class ReservationRepositoryFirestore(
             .get()
             .await()
             .toObjects(SlotCount::class.java)
-            .associate { it.startsAtSeconds to it.seatsTaken }
+            .associateBy { it.startsAtSeconds }
     }
 
     override suspend fun create(reservation: Reservation): Result<String> {
@@ -71,6 +71,12 @@ class ReservationRepositoryFirestore(
             // batch, because the new count depends on the value read a moment earlier.
             firestore.runTransaction { transaction ->
                 val current = transaction.get(slot).toObject(SlotCount::class.java)
+                val alreadyTaken = current?.takenTableIds.orEmpty()
+                // Read inside the transaction, so two diners racing for the same table
+                // cannot both win it.
+                if (toSave.tableId.isNotBlank() && toSave.tableId in alreadyTaken) {
+                    error("That table has just been taken. Pick another.")
+                }
                 transaction.set(document, toSave)
                 transaction.set(
                     slot,
@@ -78,6 +84,11 @@ class ReservationRepositoryFirestore(
                         restaurantId = reservation.restaurantId,
                         startsAtSeconds = reservation.startsAt.seconds,
                         seatsTaken = (current?.seatsTaken ?: 0) + reservation.partySize,
+                        takenTableIds = if (toSave.tableId.isBlank()) {
+                            alreadyTaken
+                        } else {
+                            alreadyTaken + toSave.tableId
+                        },
                     ),
                 )
             }.await()
@@ -105,6 +116,8 @@ class ReservationRepositoryFirestore(
                         startsAtSeconds = reservation.startsAt.seconds,
                         seatsTaken = ((current?.seatsTaken ?: 0) - reservation.partySize)
                             .coerceAtLeast(0),
+                        takenTableIds = current?.takenTableIds.orEmpty()
+                            .filterNot { it == reservation.tableId },
                     ),
                 )
             }

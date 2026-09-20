@@ -19,6 +19,9 @@ data class Reservation(
     val restaurantName: String = "",
     val startsAt: Timestamp = Timestamp.now(),
     val partySize: Int = 0,
+    /** Empty when the restaurant has not mapped its floor, or the diner let it be assigned. */
+    val tableId: String = "",
+    val tableLabel: String = "",
     val status: String = ReservationStatus.PENDING.name,
     val notes: String = "",
     val createdAt: Timestamp = Timestamp.now(),

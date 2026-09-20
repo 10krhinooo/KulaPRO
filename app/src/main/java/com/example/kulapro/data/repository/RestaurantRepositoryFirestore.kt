@@ -2,6 +2,7 @@ package com.example.kulapro.data.repository
 
 import com.example.kulapro.data.model.MenuItem
 import com.example.kulapro.data.model.Restaurant
+import com.example.kulapro.data.model.RestaurantTable
 import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
@@ -38,5 +39,15 @@ class RestaurantRepositoryFirestore(
                 .get()
                 .await()
                 .toObjects(MenuItem::class.java)
+        }
+
+    override suspend fun tables(restaurantId: String): Result<List<RestaurantTable>> =
+        runCatchingFirestore {
+            firestore.collection(FirestorePaths.RESTAURANTS)
+                .document(restaurantId)
+                .collection(FirestorePaths.TABLES)
+                .get()
+                .await()
+                .toObjects(RestaurantTable::class.java)
         }
 }

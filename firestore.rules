@@ -13,6 +13,7 @@ service cloud.firestore {
     // counter by more than one party. Both bound what a client write is able to do.
     function MAX_SEATS_PER_SLOT() { return 500; }
     function MAX_PARTY_SIZE() { return 20; }
+    function MAX_TABLES_PER_SLOT() { return 200; }
 
 
     function isSelf(userId) {
@@ -65,6 +66,13 @@ service cloud.firestore {
         allow write: if managesRestaurant(restaurantId);
       }
 
+      // The floor plan. World readable so a diner can pick a table before signing in, and
+      // writable only by the restaurant, because the plan is a statement about the room.
+      match /tables/{tableId} {
+        allow read: if true;
+        allow write: if managesRestaurant(restaurantId);
+      }
+
       // Denormalised counters are maintained only by trusted server code.
       match /stats/{statId} {
         allow read: if managesRestaurant(restaurantId);
@@ -98,6 +106,16 @@ service cloud.firestore {
             resource == null
             || math.abs(request.resource.data.seatsTaken - resource.data.seatsTaken)
                <= MAX_PARTY_SIZE()
+          )
+          // One booking claims or releases at most one table, so a client cannot empty a
+          // full room or mark every table taken in a single write.
+          && request.resource.data.get('takenTableIds', []).size() <= MAX_TABLES_PER_SLOT()
+          && (
+            resource == null
+            || math.abs(
+                 request.resource.data.get('takenTableIds', []).size()
+                 - resource.data.get('takenTableIds', []).size()
+               ) <= 1
           )
         );
       }

@@ -1,6 +1,7 @@
 package com.example.kulapro.data.repository
 
 import com.example.kulapro.data.model.Reservation
+import com.example.kulapro.data.model.SlotCount
 import com.google.firebase.Timestamp
 import kotlinx.coroutines.flow.Flow
 
@@ -9,16 +10,17 @@ interface ReservationRepository {
     fun myReservations(): Flow<List<Reservation>>
 
     /**
-     * Seats already taken per sitting for one restaurant on one day.
+     * What is already taken per sitting for one restaurant on one day, keyed by slot start
+     * in epoch seconds.
      *
-     * Reads public aggregates rather than other people's reservations, so availability works
-     * without exposing who else is booked.
+     * Reads public aggregates rather than other people's reservations, so availability and
+     * the table plan both work without exposing who else is booked.
      */
-    suspend fun seatsTakenFor(
+    suspend fun slotCountsFor(
         restaurantId: String,
         from: Timestamp,
         to: Timestamp,
-    ): Result<Map<Long, Int>>
+    ): Result<Map<Long, SlotCount>>
 
     suspend fun create(reservation: Reservation): Result<String>
 

@@ -17,4 +17,12 @@ data class SlotCount(
     /** Slot start as epoch seconds, so the key is unambiguous across time zones. */
     val startsAtSeconds: Long = 0,
     val seatsTaken: Int = 0,
+    /**
+     * Tables already claimed in this sitting.
+     *
+     * Kept next to the seat total rather than derived from reservations for the same reason
+     * the total is: a diner has to see which tables are gone, and must not be able to read
+     * the bookings that took them.
+     */
+    val takenTableIds: List<String> = emptyList(),
 )
