@@ -16,6 +16,9 @@ object AvailabilityCalculator {
 
     private const val MILLIS_PER_SECOND = 1000
 
+    /** Two covers, which is the most common booking and the least demanding test of a room. */
+    private const val DEFAULT_PARTY = 2
+
     data class Slot(
         val label: String,
         val startsAt: Date,
@@ -49,6 +52,36 @@ object AvailabilityCalculator {
             )
         }
     }
+
+    /**
+     * Whether the kitchen is serving at [at].
+     *
+     * Asks the opening hours, not the slot counters: a restaurant with every sitting sold
+     * is still open, and telling a diner otherwise would be wrong in a way they would
+     * notice by walking past.
+     */
+    fun isOpenAt(restaurant: Restaurant, at: Date): Boolean {
+        val hours = openingHoursFor(restaurant, at) ?: return false
+        val calendar = Calendar.getInstance().apply { time = at }
+        val minuteOfDay = calendar.get(Calendar.HOUR_OF_DAY) * MINUTES_PER_HOUR +
+            calendar.get(Calendar.MINUTE)
+        return minuteOfDay in hours.openMinutes..<hours.closeMinutes
+    }
+
+    /**
+     * Whether a party could still be seated today, after [now].
+     *
+     * The question Home asks of every listing at once. Sittings that have already started
+     * do not count: a table at seven is no use at eight, and offering it would be the kind
+     * of availability claim that makes the rest untrustworthy.
+     */
+    fun hasTableLaterToday(
+        restaurant: Restaurant,
+        now: Date,
+        seatsTaken: Map<Long, Int>,
+        partySize: Int = DEFAULT_PARTY,
+    ): Boolean = slotsFor(restaurant, now, seatsTaken, partySize)
+        .any { it.isAvailable && it.startsAt.after(now) }
 
     private fun openingHoursFor(restaurant: Restaurant, day: Date): OpeningHours? =
         OpeningHours.parseRange(restaurant.openingHours[OpeningHours.dayKeyFor(day)])

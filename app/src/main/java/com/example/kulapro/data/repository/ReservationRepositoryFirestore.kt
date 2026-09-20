@@ -54,6 +54,18 @@ class ReservationRepositoryFirestore(
             .associateBy { it.startsAtSeconds }
     }
 
+    override suspend fun slotCountsForAll(
+        from: Timestamp,
+        to: Timestamp,
+    ): Result<List<SlotCount>> = runCatchingFirestore {
+        firestore.collectionGroup(FirestorePaths.SLOTS)
+            .whereGreaterThanOrEqualTo("startsAtSeconds", from.seconds)
+            .whereLessThan("startsAtSeconds", to.seconds)
+            .get()
+            .await()
+            .toObjects(SlotCount::class.java)
+    }
+
     override suspend fun create(reservation: Reservation): Result<String> {
         val uid = auth.currentUser?.uid
             ?: return Result.Failure(

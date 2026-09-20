@@ -207,7 +207,6 @@ fun KulaProNavigation(
             composable(Routes.HOME) {
                 HomePage(
                     navController = navController,
-                    isSignedIn = signedInUserId != null,
                     managedRestaurantId = managedRestaurants.firstOrNull(),
                     isReviewer = isReviewer,
                     // Only offered when a scanner is configured and the user is signed in,

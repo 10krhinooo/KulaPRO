@@ -22,6 +22,16 @@ interface ReservationRepository {
         to: Timestamp,
     ): Result<Map<Long, SlotCount>>
 
+    /**
+     * The same counters for every restaurant at once, over one window.
+     *
+     * One collection group query rather than a query per listing. Home asks "who has a
+     * table tonight" of a whole list, and asking each restaurant separately would be a read
+     * per card on every load, which is the kind of thing that is fine with eight
+     * restaurants and ruinous with eight hundred.
+     */
+    suspend fun slotCountsForAll(from: Timestamp, to: Timestamp): Result<List<SlotCount>>
+
     suspend fun create(reservation: Reservation): Result<String>
 
     suspend fun cancel(reservationId: String): Result<Unit>

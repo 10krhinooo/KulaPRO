@@ -58,6 +58,18 @@ class FakeReservationRepository(
     ): Result<Map<Long, SlotCount>> =
         slotCountsFailure?.let { Result.Failure(it) } ?: Result.Success(slotCounts)
 
+    override suspend fun slotCountsForAll(
+        from: Timestamp,
+        to: Timestamp,
+    ): Result<List<SlotCount>> {
+        slotCountsFailure?.let { return Result.Failure(it) }
+        return Result.Success(
+            slotCounts.values.filter {
+                it.startsAtSeconds >= from.seconds && it.startsAtSeconds < to.seconds
+            },
+        )
+    }
+
     override suspend fun create(reservation: Reservation): Result<String> {
         createFailure?.let { return Result.Failure(it) }
         created += reservation

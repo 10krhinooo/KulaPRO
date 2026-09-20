@@ -6,6 +6,8 @@ import com.example.kulapro.data.repository.ClaimsRepository
 import com.example.kulapro.data.repository.OwnerRepository
 import com.example.kulapro.data.repository.OwnerRepositoryFirestore
 import com.example.kulapro.data.repository.OwnershipRepository
+import com.example.kulapro.data.repository.FavouritesRepository
+import com.example.kulapro.data.repository.FavouritesRepositoryFirestore
 import com.example.kulapro.data.repository.OwnershipRepositoryFirestore
 import com.example.kulapro.data.repository.ProfileRepository
 import com.example.kulapro.data.repository.ReservationRepository
@@ -65,6 +67,13 @@ object RepositoryModule {
         firestore: FirebaseFirestore,
         auth: FirebaseAuth,
     ): ReviewRepository = ReviewRepositoryFirestore(firestore, auth)
+
+    @Provides
+    @Singleton
+    fun favouritesRepository(
+        firestore: FirebaseFirestore,
+        auth: FirebaseAuth,
+    ): FavouritesRepository = FavouritesRepositoryFirestore(firestore, auth)
 
     @Provides
     @Singleton

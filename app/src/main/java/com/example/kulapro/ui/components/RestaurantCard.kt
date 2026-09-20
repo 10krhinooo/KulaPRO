@@ -14,9 +14,12 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.outlined.FavoriteBorder
 import androidx.compose.material.icons.outlined.Restaurant
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -54,6 +57,9 @@ fun RestaurantCard(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     availabilityLabel: String? = null,
+    /** Null for a guest, who has nowhere to keep a restaurant yet. */
+    isFavourite: Boolean? = null,
+    onToggleFavourite: (() -> Unit)? = null,
 ) {
     val interactionSource = remember { MutableInteractionSource() }
     val isPressed by interactionSource.collectIsPressedAsState()
@@ -102,13 +108,21 @@ fun RestaurantCard(
                     ),
             )
 
-            availabilityLabel?.let {
-                AvailabilityPill(
-                    label = it,
-                    modifier = Modifier
-                        .align(Alignment.TopEnd)
-                        .padding(12.dp),
-                )
+            Row(
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
+                availabilityLabel?.let { AvailabilityPill(label = it) }
+                if (isFavourite != null && onToggleFavourite != null) {
+                    FavouriteButton(
+                        isFavourite = isFavourite,
+                        restaurantName = restaurant.name,
+                        onClick = onToggleFavourite,
+                    )
+                }
             }
 
             Text(
@@ -250,3 +264,58 @@ fun staggerDelayMillis(index: Int): Int =
 
 /** A fully rounded pill: the radius is half the height whatever the text length. */
 private const val PILL_CORNER_PERCENT = 50
+
+/**
+ * Keeps a restaurant, or lets it go.
+ *
+ * Sits on the photo rather than in the row below it so the whole card stays one tap to
+ * open. It carries its own contentDescription naming the restaurant, because a screen
+ * reader moving down a list of hearts would otherwise hear the same word a dozen times.
+ */
+@Composable
+private fun FavouriteButton(
+    isFavourite: Boolean,
+    restaurantName: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val reduceMotion = LocalReduceMotion.current
+
+    // A small pop on filling, and none on clearing. Keeping something is the moment worth
+    // acknowledging; letting it go should be quiet.
+    val scale by animateFloatAsState(
+        targetValue = if (isFavourite && !reduceMotion) 1.1f else 1f,
+        animationSpec = Motion.bouncy(),
+        label = "favouriteScale",
+    )
+
+    Surface(
+        modifier = modifier.size(36.dp),
+        shape = CircleShape,
+        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.85f),
+        onClick = onClick,
+    ) {
+        Box(contentAlignment = Alignment.Center) {
+            Icon(
+                imageVector = if (isFavourite) {
+                    Icons.Filled.Favorite
+                } else {
+                    Icons.Outlined.FavoriteBorder
+                },
+                contentDescription = if (isFavourite) {
+                    "Remove $restaurantName from your list"
+                } else {
+                    "Keep $restaurantName"
+                },
+                tint = if (isFavourite) {
+                    MaterialTheme.colorScheme.error
+                } else {
+                    MaterialTheme.colorScheme.onSurfaceVariant
+                },
+                modifier = Modifier
+                    .size(20.dp)
+                    .scale(scale),
+            )
+        }
+    }
+}

@@ -10,4 +10,5 @@ internal object FirestorePaths {
     const val SLOTS = "slots"
     const val TABLES = "tables"
     const val OWNERSHIP_REQUESTS = "ownershipRequests"
+    const val FAVOURITES = "favourites"
 }

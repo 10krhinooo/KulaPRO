@@ -68,6 +68,12 @@ service cloud.firestore {
                        == resource.data.get('role', 'DINER');
 
       allow delete: if false;
+
+      // Restaurants this diner has kept. Nobody else's business, including a reviewer's:
+      // what someone likes is not a moderation question.
+      match /favourites/{restaurantId} {
+        allow read, write: if isSelf(userId);
+      }
     }
 
     // ---- restaurants and menus ----------------------------------------------
@@ -250,6 +256,17 @@ service cloud.firestore {
     match /nutritionCache/{hash} {
       allow read: if isSignedIn();
       allow write: if false;
+    }
+
+    // The same public seat counters, reachable as a collection group.
+    //
+    // Home asks one question of every restaurant at once, "who has a table tonight", and
+    // without this it would have to ask each restaurant separately: a read per listing on
+    // every load. A path rule is needed because a collection group query is not covered by
+    // the nested match above. These carry no personal data, which is what makes the
+    // question answerable without granting sight of anyone's booking.
+    match /{path=**}/slots/{slotId} {
+      allow read: if true;
     }
 
     // Anything not matched above is denied.
