@@ -43,139 +43,57 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
 import com.example.kulapro.Routes
-import com.example.kulapro.data.model.Reservation
 import com.example.kulapro.data.model.RestaurantTable
-import com.example.kulapro.data.repository.ReservationRepository
-import com.example.kulapro.data.repository.ReservationRepositoryFirestore
-import com.example.kulapro.data.repository.RestaurantRepository
-import com.example.kulapro.data.repository.RestaurantRepositoryFirestore
-import com.example.kulapro.data.repository.Result
 import com.example.kulapro.domain.AvailabilityCalculator
+import com.example.kulapro.feature.booking.BookingActions
+import com.example.kulapro.feature.booking.BookingUiState
+import com.example.kulapro.feature.booking.MAX_PARTY_SIZE
+import com.example.kulapro.feature.booking.MIN_PARTY_SIZE
+import com.example.kulapro.feature.booking.BookingViewModel
 import com.example.kulapro.ui.components.BookingConfirmation
-import com.example.kulapro.ui.components.MessageHost
+import com.example.kulapro.ui.components.MessageBanner
 import com.example.kulapro.ui.components.PrimaryButton
 import com.example.kulapro.ui.components.ShimmerBox
 import com.example.kulapro.ui.components.TablePlan
-import com.example.kulapro.ui.components.rememberMessageHostState
 import com.example.kulapro.ui.theme.LocalReduceMotion
 import com.example.kulapro.ui.theme.Motion
-import com.google.firebase.Timestamp
 import java.text.SimpleDateFormat
-import java.util.Calendar
 import java.util.Date
 import java.util.Locale
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
 
 /**
  * Booking form.
  *
  * Built around the three decisions a diner actually makes, in the order they make them: which
- * day, how many people, what time. Each one is a direct control rather than a text field: a
- * strip of the next two weeks, a stepper, and the real slots the kitchen can still seat.
+ * day, how many people, what time, plus the table if the restaurant has mapped its floor.
  *
- * It books the restaurant the user tapped rather than a hardcoded "The Bistro", offers only
- * slots the restaurant can still seat rather than a fixed list of nineteen times, and
- * navigates away only after the write succeeds.
+ * Stateless, with everything it draws arriving as one value and everything it does leaving as
+ * a lambda. The logic lives in [BookingViewModel], where availability depending on the day and
+ * the party size together can be tested rather than reconciled at draw time.
  */
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ReservationFormScreen(
     navController: NavController,
-    restaurantId: String,
-    restaurantName: String,
     modifier: Modifier = Modifier,
-    reservationRepository: ReservationRepository = remember { ReservationRepositoryFirestore() },
-    restaurantRepository: RestaurantRepository = remember { RestaurantRepositoryFirestore() },
+    viewModel: BookingViewModel = hiltViewModel(),
 ) {
-    val scope = rememberCoroutineScope()
-    val messages = rememberMessageHostState()
-    val dayFormat = remember { SimpleDateFormat("EEE", Locale.getDefault()) }
-    val dateFormat = remember { SimpleDateFormat("d", Locale.getDefault()) }
-    val monthFormat = remember { SimpleDateFormat("MMM", Locale.getDefault()) }
-    val summaryFormat = remember { SimpleDateFormat("EEE d MMM", Locale.getDefault()) }
-
-    val days = remember { upcomingDays(BOOKABLE_DAYS) }
-    var selectedDate by remember { mutableStateOf(days.first()) }
-    var partySize by remember { mutableStateOf(DEFAULT_PARTY_SIZE) }
-    var selectedSlot by remember { mutableStateOf<AvailabilityCalculator.Slot?>(null) }
-    var slots by remember { mutableStateOf<List<AvailabilityCalculator.Slot>>(emptyList()) }
-    var tables by remember { mutableStateOf<List<RestaurantTable>>(emptyList()) }
-    var takenBySlot by remember { mutableStateOf<Map<Long, Set<String>>>(emptyMap()) }
-    var selectedTable by remember { mutableStateOf<RestaurantTable?>(null) }
-    var isLoadingSlots by remember { mutableStateOf(true) }
-    var isSubmitting by remember { mutableStateOf(false) }
-    var confirmed by remember { mutableStateOf<String?>(null) }
-
-    // Recompute availability whenever the day or party size changes. Selecting a slot then
-    // raising the party size must be able to invalidate that slot.
-    LaunchedEffect(selectedDate, partySize, restaurantId) {
-        isLoadingSlots = true
-        selectedSlot = null
-        selectedTable = null
-
-        when (val restaurant = restaurantRepository.restaurant(restaurantId)) {
-            is Result.Failure -> {
-                slots = emptyList()
-                messages.showError(restaurant.message)
-            }
-
-            is Result.Success -> {
-                val dayStart = startOfDay(selectedDate)
-                val dayEnd = startOfDay(Date(selectedDate.time + DAY_MILLIS))
-                when (
-                    val taken = reservationRepository.slotCountsFor(
-                        restaurantId = restaurantId,
-                        from = Timestamp(dayStart),
-                        to = Timestamp(dayEnd),
-                    )
-                ) {
-                    is Result.Failure -> {
-                        slots = emptyList()
-                        messages.showError(taken.message)
-                    }
-
-                    is Result.Success -> {
-                        slots = AvailabilityCalculator.slotsFor(
-                            restaurant = restaurant.data,
-                            day = selectedDate,
-                            seatsTaken = taken.data.mapValues { it.value.seatsTaken },
-                            partySize = partySize,
-                        )
-                        takenBySlot = taken.data.mapValues { it.value.takenTableIds.toSet() }
-                    }
-                }
-            }
-        }
-        isLoadingSlots = false
-    }
-
-    // The floor plan changes far less often than availability does, so it is read once for
-    // the restaurant rather than on every change of day or party size.
-    LaunchedEffect(restaurantId) {
-        when (val result = restaurantRepository.tables(restaurantId)) {
-            is Result.Success -> tables = result.data
-            // A restaurant with no mapped tables is a supported case, not an error: the
-            // booking simply goes through on seat count and the diner is seated on arrival.
-            is Result.Failure -> tables = emptyList()
-        }
-    }
+    val state by viewModel.state.collectAsStateWithLifecycle()
 
     // The confirmation is the app's key success moment, so it gets a beat of its own before
     // the user is moved on. The old version fired a toast and navigated in the same frame.
-    confirmed?.let { whenLabel ->
+    state.confirmedLabel?.let { whenLabel ->
         LaunchedEffect(whenLabel) {
             delay(CONFIRMATION_MILLIS)
             navController.navigate(Routes.RESERVATIONS) {
@@ -185,22 +103,51 @@ fun ReservationFormScreen(
                 launchSingleTop = true
             }
         }
-        BookingConfirmation(restaurantName = restaurantName, whenLabel = whenLabel)
+        BookingConfirmation(restaurantName = state.restaurantName, whenLabel = whenLabel)
         return
     }
+
+    BookingContent(
+        state = state,
+        actions = BookingActions(
+            onBack = { navController.popBackStack() },
+            onSelectDate = viewModel::selectDate,
+            onPartySizeChange = viewModel::setPartySize,
+            onSelectSlot = viewModel::selectSlot,
+            onToggleTable = viewModel::toggleTable,
+            onSubmit = viewModel::submit,
+            onDismissMessage = viewModel::dismissMessage,
+        ),
+        modifier = modifier,
+    )
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun BookingContent(
+    state: BookingUiState,
+    actions: BookingActions,
+    modifier: Modifier = Modifier,
+) {
+    val dayFormat = remember { SimpleDateFormat("EEE", Locale.getDefault()) }
+    val dateFormat = remember { SimpleDateFormat("d", Locale.getDefault()) }
+    val monthFormat = remember { SimpleDateFormat("MMM", Locale.getDefault()) }
+    val summaryFormat = remember { SimpleDateFormat("EEE d MMM", Locale.getDefault()) }
 
     Scaffold(
         modifier = modifier,
         // Insets are owned by the navigation Scaffold; applying them again here would
         // double count the navigation bar height.
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
-        snackbarHost = { MessageHost(messages) },
+        snackbarHost = {
+            MessageBanner(message = state.message, onDismiss = actions.onDismissMessage)
+        },
         topBar = {
             TopAppBar(
                 title = {
                     Column {
                         Text(
-                            text = restaurantName.ifBlank { "Book a table" },
+                            text = state.restaurantName.ifBlank { "Book a table" },
                             style = MaterialTheme.typography.titleLarge,
                         )
                         Text(
@@ -211,7 +158,7 @@ fun ReservationFormScreen(
                     }
                 },
                 navigationIcon = {
-                    IconButton(onClick = { navController.popBackStack() }) {
+                    IconButton(onClick = actions.onBack) {
                         Icon(
                             imageVector = Icons.AutoMirrored.Rounded.ArrowBack,
                             contentDescription = "Back",
@@ -225,43 +172,19 @@ fun ReservationFormScreen(
         },
         bottomBar = {
             BookingBar(
-                summary = selectedSlot?.let {
+                summary = state.selectedSlot?.let { slot ->
                     buildString {
-                        append(summaryFormat.format(selectedDate))
+                        state.selectedDate?.let { append(summaryFormat.format(it)) }
                         append(", ")
-                        append(it.label)
+                        append(slot.label)
                         append(", ")
-                        append(partySize)
-                        append(if (partySize == 1) " guest" else " guests")
-                        selectedTable?.let { table -> append(", table ${table.label}") }
+                        append(state.partySize)
+                        append(if (state.partySize == 1) " guest" else " guests")
+                        state.selectedTable?.let { append(", table ${it.label}") }
                     }
                 },
-                isSubmitting = isSubmitting,
-                onConfirm = {
-                    val slot = selectedSlot ?: return@BookingBar
-                    isSubmitting = true
-                    scope.launch {
-                        val result = reservationRepository.create(
-                            Reservation(
-                                restaurantId = restaurantId,
-                                restaurantName = restaurantName,
-                                startsAt = Timestamp(slot.startsAt),
-                                partySize = partySize,
-                                tableId = selectedTable?.id.orEmpty(),
-                                tableLabel = selectedTable?.label.orEmpty(),
-                            ),
-                        )
-                        isSubmitting = false
-                        when (result) {
-                            // Navigate only on success. The first version navigated home
-                            // unconditionally, so a failed write still looked like a booking.
-                            is Result.Success ->
-                                confirmed = "${summaryFormat.format(selectedDate)} at ${slot.label}"
-
-                            is Result.Failure -> messages.showError(result.message)
-                        }
-                    }
-                },
+                isSubmitting = state.isSubmitting,
+                onConfirm = actions.onSubmit,
             )
         },
     ) { padding ->
@@ -274,9 +197,9 @@ fun ReservationFormScreen(
         ) {
             StepHeading(number = 1, title = "When are you coming?")
             DayStrip(
-                days = days,
-                selected = selectedDate,
-                onSelect = { selectedDate = it },
+                days = state.days,
+                selected = state.selectedDate,
+                onSelect = actions.onSelectDate,
                 dayFormat = dayFormat,
                 dateFormat = dateFormat,
                 monthFormat = monthFormat,
@@ -284,42 +207,36 @@ fun ReservationFormScreen(
 
             StepHeading(number = 2, title = "How many of you?")
             PartySizeStepper(
-                value = partySize,
-                onChange = { partySize = it },
+                value = state.partySize,
+                onChange = actions.onPartySizeChange,
                 modifier = Modifier.padding(horizontal = 16.dp),
             )
 
             StepHeading(number = 3, title = "What time suits?")
             Box(modifier = Modifier.padding(horizontal = 16.dp)) {
                 when {
-                    isLoadingSlots -> SlotSkeleton()
+                    state.isLoadingSlots -> SlotSkeleton()
 
-                    slots.isEmpty() -> SlotNotice(
+                    state.isClosedToday -> SlotNotice(
                         "This restaurant is closed on that day. Try another.",
                     )
 
-                    slots.none { it.isAvailable } -> SlotNotice(
-                        "Fully booked for a party of $partySize. " +
+                    state.isFullyBooked -> SlotNotice(
+                        "Fully booked for a party of ${state.partySize}. " +
                             "Try another day or a smaller table.",
                     )
 
                     else -> SlotGrid(
-                        slots = slots,
-                        selected = selectedSlot,
-                        onSelect = {
-                            selectedSlot = it
-                            // A table is only free within a sitting, so changing the time
-                            // invalidates whatever was picked.
-                            selectedTable = null
-                        },
+                        slots = state.slots,
+                        selected = state.selectedSlot,
+                        onSelect = actions.onSelectSlot,
                     )
                 }
             }
 
             // Only offered once there is a sitting to be free within, and only by
             // restaurants that have actually mapped their floor.
-            val slot = selectedSlot
-            if (tables.isNotEmpty() && slot != null) {
+            if (state.showsTablePlan) {
                 StepHeading(number = 4, title = "Where would you like to sit?")
                 Text(
                     text = "Optional. Skip it and the restaurant will seat you on arrival.",
@@ -328,16 +245,11 @@ fun ReservationFormScreen(
                     modifier = Modifier.padding(horizontal = 16.dp),
                 )
                 TablePlan(
-                    tables = tables,
-                    takenTableIds = takenBySlot[slot.startsAt.time / MILLIS_PER_SECOND]
-                        .orEmpty(),
-                    partySize = partySize,
-                    selectedTableId = selectedTable?.id,
-                    onSelect = { table ->
-                        // Tapping the chosen table again clears it, so picking a table is
-                        // never a decision the diner cannot take back.
-                        selectedTable = if (selectedTable?.id == table.id) null else table
-                    },
+                    tables = state.tables,
+                    takenTableIds = state.takenTableIds,
+                    partySize = state.partySize,
+                    selectedTableId = state.selectedTable?.id,
+                    onSelect = actions.onToggleTable,
                     modifier = Modifier.padding(16.dp),
                 )
             }
@@ -378,7 +290,7 @@ private fun StepHeading(number: Int, title: String) {
 @Composable
 private fun DayStrip(
     days: List<Date>,
-    selected: Date,
+    selected: Date?,
     onSelect: (Date) -> Unit,
     dayFormat: SimpleDateFormat,
     dateFormat: SimpleDateFormat,
@@ -629,38 +541,6 @@ private fun BookingBar(
         }
     }
 }
-
-/** Today plus the next [count] minus one days, each normalised to midnight. */
-private fun upcomingDays(count: Int): List<Date> {
-    val calendar = Calendar.getInstance().apply {
-        set(Calendar.HOUR_OF_DAY, 0)
-        set(Calendar.MINUTE, 0)
-        set(Calendar.SECOND, 0)
-        set(Calendar.MILLISECOND, 0)
-    }
-    return List(count) {
-        calendar.time.also { calendar.add(Calendar.DAY_OF_YEAR, 1) }
-    }
-}
-
-private fun startOfDay(date: Date): Date = Calendar.getInstance().apply {
-    time = date
-    set(Calendar.HOUR_OF_DAY, 0)
-    set(Calendar.MINUTE, 0)
-    set(Calendar.SECOND, 0)
-    set(Calendar.MILLISECOND, 0)
-}.time
-
-private const val DAY_MILLIS = 24L * 60 * 60 * 1000
-private const val MILLIS_PER_SECOND = 1000L
-
-/** Two weeks ahead. Far enough to plan, near enough that availability still means something. */
-private const val BOOKABLE_DAYS = 14
-private const val DEFAULT_PARTY_SIZE = 2
-private const val MIN_PARTY_SIZE = 1
-
-/** Larger parties are a phone call to the restaurant, not a self service booking. */
-private const val MAX_PARTY_SIZE = 12
 
 /** Below this many seats the slot is called out as nearly gone. */
 private const val SCARCE_SEATS = 4

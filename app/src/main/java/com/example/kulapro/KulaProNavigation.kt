@@ -329,16 +329,9 @@ fun KulaProNavigation(
             ) { entry ->
                 // The restaurant travels with the route. The first version dropped it and
                 // hardcoded every booking to "The Bistro".
-                val restaurantId = entry.arguments?.getString("restaurantId").orEmpty()
-                val encodedName = entry.arguments?.getString("restaurantName").orEmpty()
-                ReservationFormScreen(
-                    navController = navController,
-                    restaurantId = restaurantId,
-                    restaurantName = URLDecoder.decode(
-                        encodedName,
-                        StandardCharsets.UTF_8.name(),
-                    ),
-                )
+                // The arguments travel to the view model through SavedStateHandle rather
+                // than being read here and passed down.
+                ReservationFormScreen(navController = navController)
             }
         }
     }

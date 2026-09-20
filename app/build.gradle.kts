@@ -169,6 +169,12 @@ kover {
                 classes(
                     "com.example.kulapro.domain.*",
                     "com.example.kulapro.util.*",
+                    // View models carry the screen logic that used to sit inside
+                    // composables, where it could not be tested. Gating them is the whole
+                    // reason for lifting it out.
+                    "com.example.kulapro.feature.*ViewModel",
+                    "com.example.kulapro.feature.*UiState*",
+                    "com.example.kulapro.feature.*UiStateKt",
                 )
             }
             excludes {
