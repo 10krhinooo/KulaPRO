@@ -109,3 +109,19 @@ jobs:
       - run: npm ci --prefix rules-tests
       # Rules run against the emulator, so no CI credentials and no real project are touched.
       - run: firebase emulators:exec --only firestore --project kulapro-test "npm test --prefix rules-tests"
+
+  scanner:
+    name: Scanner worker
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: worker/package-lock.json
+      - run: npm ci --prefix worker
+      # No key and no deployment: the tests stand in a fake for the model and for KV, so
+      # nothing here costs money or touches Cloudflare.
+      - run: npm run typecheck --prefix worker
+      - run: npm test --prefix worker
