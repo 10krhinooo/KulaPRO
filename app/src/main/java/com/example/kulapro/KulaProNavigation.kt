@@ -1,5 +1,6 @@
 package com.example.kulapro
 
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.padding
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
@@ -27,7 +28,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.draw.scale
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.navigation.NavController
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
@@ -42,6 +42,7 @@ import com.example.kulapro.data.repository.Result
 import com.example.kulapro.feature.owner.OwnerPortal
 import com.example.kulapro.feature.ownership.OwnershipRequestScreen
 import com.example.kulapro.feature.home.SearchScreen
+import com.example.kulapro.feature.reservations.ReservationsScreen
 import com.example.kulapro.feature.ownership.OwnershipReviewScreen
 import com.example.kulapro.feature.scanner.ScannerScreen
 import com.example.kulapro.pages.AboutScreen
@@ -52,21 +53,12 @@ import com.example.kulapro.pages.ProfilePage
 import com.example.kulapro.pages.RegisterPage
 import com.example.kulapro.pages.RestaurantDetailScreen
 import com.example.kulapro.pages.ReservationFormScreen
-import com.example.kulapro.pages.ReservationScreen
 import com.example.kulapro.pages.SettingsScreen
 import com.example.kulapro.ui.components.SignInRequiredDialog
 import com.example.kulapro.ui.theme.LocalReduceMotion
 import com.example.kulapro.ui.theme.Motion
 import java.net.URLDecoder
 import java.nio.charset.StandardCharsets
-
-private data class Tab(val route: String, val label: String, val icon: ImageVector)
-
-private val tabs = listOf(
-    Tab(Routes.HOME, "Home", Icons.Filled.Home),
-    Tab(Routes.RESERVATIONS, "Reservations", Icons.AutoMirrored.Filled.List),
-    Tab(Routes.PROFILE, "Profile", Icons.Filled.AccountCircle),
-)
 
 @Composable
 fun KulaProNavigation(
@@ -133,20 +125,14 @@ fun KulaProNavigation(
         )
     }
 
-    Scaffold(
-        modifier = modifier,
-        bottomBar = {
-            // Derived from the back stack rather than held in local state, so the highlighted
-            // tab can never drift from the screen actually being shown.
-            if (tabs.any { it.route == currentRoute }) {
-                BottomNavigationBar(navController = navController, currentRoute = currentRoute)
-            }
-        },
-    ) { padding ->
+    // No bottom bar here. It belongs to the three tab screens and is drawn inside each of
+    // them, so it slides in and out with its own screen. Held at this level it stayed put
+    // while a full screen destination slid over the top, and for the length of the
+    // transition the diner's bar and the restaurant portal's were both on screen.
+    Box(modifier = modifier) {
         NavHost(
             navController = navController,
             startDestination = startDestination,
-            modifier = Modifier.padding(padding),
             // Defined once here so every destination moves the same way, rather than each
             // screen inventing its own transition.
             enterTransition = {
@@ -317,8 +303,8 @@ fun KulaProNavigation(
                 OwnershipReviewScreen(onBack = { navController.popBackStack() })
             }
             composable(Routes.RESERVATIONS) {
-                ReservationScreen(
-                    isSignedIn = signedInUserId != null,
+                ReservationsScreen(
+                    navController = navController,
                     onSignIn = {
                         navController.navigate(Routes.login(next = Routes.RESERVATIONS))
                     },
@@ -393,7 +379,7 @@ fun KulaProNavigation(
 }
 
 @Composable
-private fun BottomNavigationBar(navController: NavController, currentRoute: String?) {
+fun BottomNavigationBar(navController: NavController, currentRoute: String?) {
     NavigationBar(containerColor = MaterialTheme.colorScheme.surface) {
         tabs.forEach { tab ->
             val selected = currentRoute == tab.route

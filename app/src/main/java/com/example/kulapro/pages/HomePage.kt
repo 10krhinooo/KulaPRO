@@ -34,6 +34,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
 import com.example.kulapro.R
+import com.example.kulapro.BottomNavigationBar
 import com.example.kulapro.Routes
 import com.example.kulapro.feature.home.HomeViewModel
 import com.example.kulapro.feature.home.RestaurantResultList
@@ -65,9 +66,12 @@ fun HomePage(
 
     Scaffold(
         modifier = modifier,
-        // Insets are owned by the navigation Scaffold; applying them again here would
-        // double count the navigation bar height.
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
+        // The tab bar belongs to this screen rather than to the navigation scaffold, so it
+        // slides away with Home instead of staying put while another destination covers it.
+        bottomBar = {
+            BottomNavigationBar(navController = navController, currentRoute = Routes.HOME)
+        },
         snackbarHost = {
             MessageBanner(
                 message = state.message?.let(UiMessage::error),

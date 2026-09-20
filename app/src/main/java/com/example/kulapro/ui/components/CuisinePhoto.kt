@@ -43,33 +43,36 @@ private fun indexFor(value: String, size: Int): Int =
     ((value.hashCode().toLong() and Int.MAX_VALUE.toLong()) % size).toInt()
 
 /**
- * Cuisines grouped by what the food actually looks like, three to a photo.
+ * Cuisines grouped so that no two restaurants sitting next to each other share a photo.
  *
- * Grilled meat, flatbread, seafood and plated European covers the seeded list evenly.
- * Loading five cuisines onto one photo, as this did, guaranteed repeats on screen.
+ * Grouping purely by how the food looks put Italian and Mexican on the same picture, and in
+ * a list ordered by name those two land side by side, which is the exact pair that made the
+ * whole screen read as a mock-up. So the grouping is a compromise between what the food
+ * looks like and where the restaurants fall in the list, and every pairing below is still
+ * one a diner would accept: tacos are grilled, naan is a flatbread, Swahili food is coastal.
  */
 private val FALLBACKS = linkedMapOf(
-    // Charred meat over fire.
+    // Over fire.
     "grill" to R.drawable.grill,
     "kenyan" to R.drawable.grill,
-    "ethiopian" to R.drawable.grill,
+    "mexican" to R.drawable.grill,
+    "swahili" to R.drawable.grill,
 
-    // Flatbread and things folded into it.
+    // Flatbread, and things served on or in it.
     "italian" to R.drawable.pizza,
     "pizza" to R.drawable.pizza,
-    "mexican" to R.drawable.pizza,
     "indian" to R.drawable.pizza,
+    "vegetarian" to R.drawable.pizza,
 
     // Fish and rice.
     "japanese" to R.drawable.sushi,
     "sushi" to R.drawable.sushi,
     "chinese" to R.drawable.sushi,
-    "swahili" to R.drawable.sushi,
 
     // Plated, knife and fork.
     "european" to R.drawable.bistro,
     "levantine" to R.drawable.bistro,
-    "vegetarian" to R.drawable.bistro,
+    "ethiopian" to R.drawable.bistro,
 )
 
 private val ROTATION = listOf(

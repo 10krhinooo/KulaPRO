@@ -3,6 +3,8 @@ package com.example.kulapro.pages
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
@@ -158,13 +160,17 @@ private fun SectionLabel(text: String) {
     )
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun ThemeModeChooser(selected: ThemeMode, onSelect: (ThemeMode) -> Unit) {
     Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
         Text("Theme", style = MaterialTheme.typography.bodyLarge)
-        Row(
+        // Wrapping rather than a fixed row. Three chips with real labels do not fit the
+        // width of a phone, and a Row answers that by crushing the last one.
+        FlowRow(
             modifier = Modifier.padding(top = 8.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             ThemeMode.entries.forEach { mode ->
                 FilterChip(
@@ -177,19 +183,23 @@ private fun ThemeModeChooser(selected: ThemeMode, onSelect: (ThemeMode) -> Unit)
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun ReminderLeadChooser(selected: Int, onSelect: (Int) -> Unit) {
     Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
-        Text("Remind me", style = MaterialTheme.typography.bodyLarge)
-        Row(
+        Text("How long before", style = MaterialTheme.typography.bodyLarge)
+        FlowRow(
             modifier = Modifier.padding(top = 8.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             LEAD_CHOICES.forEach { hours ->
                 FilterChip(
                     selected = hours == selected,
                     onClick = { onSelect(hours) },
-                    label = { Text(if (hours == 1) "1 hour before" else "$hours hours before") },
+                    // "before" moves into the heading above rather than being repeated on
+                    // every chip, which is what made these too wide to sit in one row.
+                    label = { Text(leadLabel(hours)) },
                 )
             }
         }
@@ -198,3 +208,11 @@ private fun ReminderLeadChooser(selected: Int, onSelect: (Int) -> Unit) {
 
 /** Applies to bookings made from now on, since a reminder is scheduled when one is made. */
 private val LEAD_CHOICES = listOf(1, 3, 24)
+
+private fun leadLabel(hours: Int): String = when (hours) {
+    1 -> "1 hour"
+    HOURS_IN_A_DAY -> "A day"
+    else -> "$hours hours"
+}
+
+private const val HOURS_IN_A_DAY = 24

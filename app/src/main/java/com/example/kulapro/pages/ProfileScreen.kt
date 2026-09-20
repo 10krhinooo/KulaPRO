@@ -52,6 +52,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
+import com.example.kulapro.BottomNavigationBar
 import com.example.kulapro.Routes
 import com.example.kulapro.data.model.OwnershipRequest
 import com.example.kulapro.data.repository.AuthRepository
@@ -140,9 +141,10 @@ fun ProfilePage(
 
     Scaffold(
         modifier = modifier,
-        // Insets are owned by the navigation Scaffold; applying them again here would
-        // double count the navigation bar height.
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
+        bottomBar = {
+            BottomNavigationBar(navController = navController, currentRoute = Routes.PROFILE)
+        },
         topBar = {
             TopAppBar(
                 title = { Text("Profile") },
