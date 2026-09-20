@@ -195,8 +195,6 @@ fun KulaProNavigation(
             composable(Routes.HOME) {
                 HomePage(
                     navController = navController,
-                    managedRestaurantId = managedRestaurants.firstOrNull(),
-                    isReviewer = isReviewer,
                     // Only offered when a scanner is configured and the user is signed in,
                     // since a scan is counted against their daily quota and therefore has
                     // to belong to somebody.
@@ -204,9 +202,6 @@ fun KulaProNavigation(
                         { navController.navigate(Routes.scanner()) }
                     } else {
                         null
-                    },
-                    onSwitchToHosting = { restaurantId ->
-                        navController.navigate(Routes.owner(restaurantId))
                     },
                     onOpenRestaurant = { restaurantId ->
                         navController.navigate(Routes.restaurant(restaurantId))
@@ -328,10 +323,14 @@ fun KulaProNavigation(
                     navController = navController,
                     onSignIn = { navController.navigate(Routes.login(next = Routes.PROFILE)) },
                     onListRestaurant = { navController.navigate(Routes.LIST_RESTAURANT) },
-                    // Only offered to a reviewer, so the app never shows a door the rules
-                    // would refuse to open.
-                    onReviewRequests = if (isReviewer) {
-                        { navController.navigate(Routes.OWNERSHIP_REVIEW) }
+                    // Each of the other two views is offered only to someone whose claims
+                    // already allow it, so the app never shows a door the rules would
+                    // refuse to open.
+                    onOpenHosting = managedRestaurants.firstOrNull()?.let { restaurantId ->
+                        { navController.navigate(Routes.owner(restaurantId)) }
+                    },
+                    onOpenAdmin = if (isReviewer) {
+                        { navController.navigate(Routes.owner("")) }
                     } else {
                         null
                     },

@@ -11,9 +11,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.PhotoCamera
-import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.Search
-import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.Icon
@@ -38,8 +36,6 @@ import com.example.kulapro.BottomNavigationBar
 import com.example.kulapro.Routes
 import com.example.kulapro.feature.home.HomeViewModel
 import com.example.kulapro.feature.home.RestaurantResultList
-import com.example.kulapro.feature.owner.Portal
-import com.example.kulapro.feature.owner.PortalSwitcher
 import com.example.kulapro.ui.components.MessageBanner
 import com.example.kulapro.ui.components.UiMessage
 import com.example.kulapro.ui.components.rememberListEntryAnimator
@@ -49,11 +45,8 @@ import com.example.kulapro.ui.components.rememberListEntryAnimator
 fun HomePage(
     navController: NavController,
     onOpenRestaurant: (restaurantId: String) -> Unit,
-    onSwitchToHosting: (String) -> Unit,
     onSearch: () -> Unit,
     modifier: Modifier = Modifier,
-    managedRestaurantId: String? = null,
-    isReviewer: Boolean = false,
     /** Null when no scanner is configured, or when nobody is signed in to charge it to. */
     onScanDish: (() -> Unit)? = null,
     viewModel: HomeViewModel = hiltViewModel(),
@@ -90,35 +83,21 @@ fun HomePage(
             }
         },
         topBar = {
-            // Left aligned rather than centred: with a portal switcher and two icons in the
-            // actions slot, a centred title is squeezed into a column narrow enough to wrap
-            // the wordmark onto two lines.
+            // Left aligned rather than centred, which is what gives the wordmark room to
+            // sit at full width beside the search button.
             TopAppBar(
                 title = { Wordmark() },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = MaterialTheme.colorScheme.surface,
                     titleContentColor = MaterialTheme.colorScheme.primary,
                 ),
+                // Search alone. Settings, About and the way into the restaurant side all
+                // live on Profile now: they are about the account and the app rather than
+                // about finding somewhere to eat, and four controls crowded a bar whose job
+                // is to get out of the way of the list.
                 actions = {
-                    // Only rendered when the user's claims name a restaurant to manage or a
-                    // platform role to exercise, so the control never promises access the
-                    // rules would refuse. A reviewer who hosts nothing still has an admin
-                    // side: the requests waiting on them.
-                    if (managedRestaurantId != null || isReviewer) {
-                        PortalSwitcher(
-                            current = Portal.CUSTOMER,
-                            onSwitch = { onSwitchToHosting(managedRestaurantId.orEmpty()) },
-                            modifier = Modifier.padding(end = 4.dp),
-                        )
-                    }
                     IconButton(onClick = onSearch) {
                         Icon(Icons.Rounded.Search, contentDescription = "Search restaurants")
-                    }
-                    IconButton(onClick = { navController.navigate(Routes.SETTINGS) }) {
-                        Icon(Icons.Rounded.Settings, contentDescription = "Settings")
-                    }
-                    IconButton(onClick = { navController.navigate(Routes.ABOUT) }) {
-                        Icon(Icons.Rounded.Info, contentDescription = "About")
                     }
                 },
             )

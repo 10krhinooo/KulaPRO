@@ -11,7 +11,6 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
@@ -22,15 +21,18 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
 import androidx.compose.material.icons.filled.ExpandMore
-import androidx.compose.material.icons.outlined.Logout
+import androidx.compose.material.icons.outlined.AddBusiness
+import androidx.compose.material.icons.outlined.AdminPanelSettings
+import androidx.compose.material.icons.outlined.Storefront
 import androidx.compose.material.icons.rounded.Email
+import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.Lock
 import androidx.compose.material.icons.rounded.Person
 import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
@@ -90,8 +92,10 @@ fun ProfilePage(
     onSignIn: () -> Unit,
     modifier: Modifier = Modifier,
     onListRestaurant: () -> Unit = {},
-    /** Null for everyone who does not review ownership requests, which is almost everyone. */
-    onReviewRequests: (() -> Unit)? = null,
+    /** Null unless this user's claims name a restaurant they may run. */
+    onOpenHosting: (() -> Unit)? = null,
+    /** Null for everyone who does not run the platform, which is almost everyone. */
+    onOpenAdmin: (() -> Unit)? = null,
     appContext: android.content.Context = LocalContext.current.applicationContext,
     authRepository: AuthRepository = remember { AuthRepositoryFirebase(appContext) },
     profileRepository: ProfileRepository = authRepository as ProfileRepository,
@@ -145,24 +149,20 @@ fun ProfilePage(
         bottomBar = {
             BottomNavigationBar(navController = navController, currentRoute = Routes.PROFILE)
         },
-        topBar = {
-            TopAppBar(
-                title = { Text("Profile") },
-                actions = {
-                    IconButton(onClick = { navController.navigate(Routes.SETTINGS) }) {
-                        Icon(Icons.Rounded.Settings, contentDescription = "Settings")
-                    }
-                },
-            )
-        },
+        topBar = { TopAppBar(title = { Text("Profile") }) },
         snackbarHost = { MessageHost(messages) },
     ) { padding ->
         if (email == null) {
-            Box(
+            // A guest still gets the app links. Settings holds the theme and the reminder
+            // preferences, and neither of those is anybody's account, so putting them
+            // behind a sign-in wall would take away a setting for no reason.
+            Column(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(padding),
-                contentAlignment = Alignment.Center,
+                    .padding(padding)
+                    .verticalScroll(rememberScrollState())
+                    .padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp),
             ) {
                 SignInPrompt(
                     title = "Sign in to manage your profile",
@@ -170,6 +170,7 @@ fun ProfilePage(
                         "and review the places you have been.",
                     onSignIn = onSignIn,
                 )
+                AppLinks(navController = navController)
             }
             return@Scaffold
         }
@@ -300,16 +301,37 @@ fun ProfilePage(
 
             MyRequestsCard(requests = myRequests)
 
+            // The three views of this app, entered from here rather than from Home. Each is
+            // offered only to someone whose claims already allow it, so the app never shows
+            // a door the security rules would refuse to open.
+            onOpenHosting?.let { hosting ->
+                NavigationRow(
+                    title = "Restaurant hosting",
+                    subtitle = "Tonight's covers, bookings, menu and capacity",
+                    icon = Icons.Outlined.Storefront,
+                    onClick = hosting,
+                )
+            }
+
+            onOpenAdmin?.let { admin ->
+                NavigationRow(
+                    title = "Admin console",
+                    subtitle = "Ownership requests and how the platform is running",
+                    icon = Icons.Outlined.AdminPanelSettings,
+                    onClick = admin,
+                )
+            }
+
             // Offered to everyone: most diners never tap it, and the ones who do are the
             // restaurants this app is short of.
-            SecondaryButton(
-                text = "List your restaurant",
+            NavigationRow(
+                title = "List your restaurant",
+                subtitle = "Claim a listing or add one that is missing",
+                icon = Icons.Outlined.AddBusiness,
                 onClick = onListRestaurant,
             )
 
-            onReviewRequests?.let { review ->
-                SecondaryButton(text = "Review ownership requests", onClick = review)
-            }
+            AppLinks(navController = navController)
 
             SecondaryButton(
                 text = "Sign out",
@@ -321,6 +343,77 @@ fun ProfilePage(
                         popUpTo(navController.graph.id) { inclusive = true }
                     }
                 },
+            )
+        }
+    }
+}
+
+/**
+ * Settings and About.
+ *
+ * Both used to sit as icons in Home's top bar, beside the wordmark and the search button,
+ * where they competed for room with the one control that screen is actually for. Neither is
+ * about finding somewhere to eat, and both are about the person using the app, so they
+ * belong on the screen that already is.
+ */
+@Composable
+private fun AppLinks(navController: NavController, modifier: Modifier = Modifier) {
+    Column(
+        modifier = modifier,
+        verticalArrangement = Arrangement.spacedBy(16.dp),
+    ) {
+        NavigationRow(
+            title = "Settings",
+            subtitle = "Theme, colour and booking reminders",
+            icon = Icons.Rounded.Settings,
+            onClick = { navController.navigate(Routes.SETTINGS) },
+        )
+        NavigationRow(
+            title = "About",
+            subtitle = "Version, licences and what this app is for",
+            icon = Icons.Rounded.Info,
+            onClick = { navController.navigate(Routes.ABOUT) },
+        )
+    }
+}
+
+/** A place to go, named and explained, with the same shape as the sections above it. */
+@Composable
+private fun NavigationRow(
+    title: String,
+    subtitle: String,
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Surface(
+        modifier = modifier.fillMaxWidth(),
+        shape = MaterialTheme.shapes.large,
+        color = MaterialTheme.colorScheme.surfaceVariant,
+        onClick = onClick,
+    ) {
+        Row(
+            modifier = Modifier.padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(16.dp),
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Column(modifier = Modifier.weight(1f)) {
+                Text(text = title, style = MaterialTheme.typography.titleSmall)
+                Text(
+                    text = subtitle,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            Icon(
+                imageVector = Icons.AutoMirrored.Rounded.KeyboardArrowRight,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
     }
