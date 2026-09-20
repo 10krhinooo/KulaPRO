@@ -44,6 +44,7 @@ import com.example.kulapro.data.repository.Result
 import com.example.kulapro.ui.components.AnimatedListItem
 import com.example.kulapro.ui.components.EmptyState
 import com.example.kulapro.ui.components.MessageHost
+import com.example.kulapro.ui.components.rememberListEntryAnimator
 import com.example.kulapro.ui.components.PrimaryButton
 import com.example.kulapro.ui.components.SecondaryButton
 import com.example.kulapro.ui.components.rememberMessageHostState
@@ -71,6 +72,7 @@ fun OwnershipReviewScreen(
     val messages = rememberMessageHostState()
     var busyRequestId by remember { mutableStateOf<String?>(null) }
     var rejecting by remember { mutableStateOf<OwnershipRequest?>(null) }
+    val entryAnimator = rememberListEntryAnimator()
 
     val requests by produceState(initialValue = emptyList<OwnershipRequest>(), repository) {
         repository.pendingRequests().collect { value = it }
@@ -141,7 +143,7 @@ fun OwnershipReviewScreen(
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             itemsIndexed(requests, key = { _, pending -> pending.id }) { index, request ->
-                AnimatedListItem(index = index) {
+                AnimatedListItem(index = index, key = request.id, animator = entryAnimator) {
                     RequestCard(
                         request = request,
                         isBusy = busyRequestId == request.id,

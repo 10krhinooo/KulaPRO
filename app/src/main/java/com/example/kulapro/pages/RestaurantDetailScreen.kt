@@ -61,6 +61,7 @@ import com.example.kulapro.data.repository.ReviewRepository
 import com.example.kulapro.data.repository.ReviewRepositoryFirestore
 import com.example.kulapro.ui.components.AnimatedListItem
 import com.example.kulapro.ui.components.MessageHost
+import com.example.kulapro.ui.components.rememberListEntryAnimator
 import com.example.kulapro.ui.components.PrimaryButton
 import com.example.kulapro.ui.components.RatingBar
 import com.example.kulapro.ui.components.SecondaryButton
@@ -95,6 +96,8 @@ fun RestaurantDetailScreen(
     reviewRepository: ReviewRepository = remember { ReviewRepositoryFirestore() },
 ) {
     val messages = rememberMessageHostState()
+    // Hoisted above the list so a menu row does not replay its entrance on every scroll.
+    val entryAnimator = rememberListEntryAnimator()
     var restaurant by remember { mutableStateOf<Restaurant?>(null) }
     var menu by remember { mutableStateOf<List<MenuItem>>(emptyList()) }
     var isLoading by remember { mutableStateOf(true) }
@@ -214,7 +217,7 @@ fun RestaurantDetailScreen(
             }
 
             itemsIndexed(menu, key = { _, item -> item.id }) { index, item ->
-                AnimatedListItem(index = index) {
+                AnimatedListItem(index = index, key = item.id, animator = entryAnimator) {
                     MenuRow(item = item, modifier = Modifier.padding(horizontal = 16.dp))
                 }
             }

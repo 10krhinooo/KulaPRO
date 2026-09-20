@@ -49,6 +49,7 @@ import com.example.kulapro.data.repository.RestaurantRepositoryFirestore
 import com.example.kulapro.feature.owner.Portal
 import com.example.kulapro.feature.owner.PortalSwitcher
 import com.example.kulapro.ui.components.AnimatedListItem
+import com.example.kulapro.ui.components.rememberListEntryAnimator
 import com.example.kulapro.ui.components.EmptyState
 import com.example.kulapro.ui.components.RestaurantCard
 import com.example.kulapro.ui.components.RestaurantCardSkeleton
@@ -82,6 +83,10 @@ fun HomePage(
         if (isSignedIn) profileRepository.profileFlow().collect { value = it }
     }
     val firstName = profile?.displayName.orEmpty().trim().substringBefore(' ')
+
+    // Hoisted above the list, so a card that scrolls away and back does not replay its
+    // entrance and appear to load late.
+    val entryAnimator = rememberListEntryAnimator()
 
     Scaffold(
         modifier = modifier,
@@ -185,8 +190,17 @@ fun HomePage(
                     contentPadding = PaddingValues(16.dp),
                     verticalArrangement = Arrangement.spacedBy(16.dp),
                 ) {
-                    itemsIndexed(restaurants) { index, restaurant ->
-                        AnimatedListItem(index = index) {
+                    // Keyed so a row scrolled out and back is the same row, not a new one
+                    // rebuilt from scratch.
+                    itemsIndexed(
+                        items = restaurants,
+                        key = { _, restaurant -> restaurant.id },
+                    ) { index, restaurant ->
+                        AnimatedListItem(
+                            index = index,
+                            key = restaurant.id,
+                            animator = entryAnimator,
+                        ) {
                             RestaurantCard(
                                 restaurant = restaurant,
                                 onClick = { onOpenRestaurant(restaurant.id) },
