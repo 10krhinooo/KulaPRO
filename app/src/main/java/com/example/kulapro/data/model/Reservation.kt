@@ -24,6 +24,14 @@ data class Reservation(
     val tableLabel: String = "",
     val status: String = ReservationStatus.PENDING.name,
     val notes: String = "",
+    /**
+     * A party the restaurant seated without a booking.
+     *
+     * Recorded so the capacity model reflects the room rather than only what came through
+     * the app. Without it an owner's dashboard would show a half empty restaurant on the
+     * busiest night of the week. These carry no userId, because there is no user.
+     */
+    val isWalkIn: Boolean = false,
     val createdAt: Timestamp = Timestamp.now(),
 ) {
     val statusEnum: ReservationStatus
@@ -34,12 +42,33 @@ data class Reservation(
 enum class ReservationStatus {
     PENDING,
     CONFIRMED,
+
+    /** They arrived and are at the table now. */
+    SEATED,
     CANCELLED,
     COMPLETED,
     NO_SHOW,
     ;
 
-    /** Statuses that occupy a seat, and so count against a slot's capacity. */
+    /**
+     * Statuses that occupy a seat, and so count against a slot's capacity.
+     *
+     * A seated party is very much taking up a table, so it counts. A completed one has
+     * left, and a no-show never came, so neither should keep blocking the sitting.
+     */
     val occupiesCapacity: Boolean
-        get() = this == PENDING || this == CONFIRMED
+        get() = this == PENDING || this == CONFIRMED || this == SEATED
+
+    /** Whether the restaurant still has something to do about this booking. */
+    val isOpen: Boolean
+        get() = this == PENDING || this == CONFIRMED || this == SEATED
+
+    /** What the restaurant would sensibly do next, in the order a service runs. */
+    val nextActions: List<ReservationStatus>
+        get() = when (this) {
+            PENDING -> listOf(CONFIRMED, CANCELLED)
+            CONFIRMED -> listOf(SEATED, NO_SHOW, CANCELLED)
+            SEATED -> listOf(COMPLETED)
+            CANCELLED, COMPLETED, NO_SHOW -> emptyList()
+        }
 }

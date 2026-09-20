@@ -213,10 +213,24 @@ service cloud.firestore {
       // userId is pinned to the caller, so a client cannot book on someone else's behalf
       // or write a reservation it would then be unable to read.
       allow create: if isSignedIn()
-        && request.resource.data.userId == request.auth.uid
         && request.resource.data.partySize is int
         && request.resource.data.partySize > 0
-        && request.resource.data.status == 'PENDING';
+        && (
+          // A diner booking for themselves.
+          (
+            request.resource.data.userId == request.auth.uid
+            && request.resource.data.status == 'PENDING'
+            && request.resource.data.get('isWalkIn', false) == false
+          )
+          // Or the restaurant recording a party it seated without a booking, so the
+          // capacity model reflects the room rather than only what came through the app.
+          // A walk-in has no user, and saying so is what keeps it out of anyone's list.
+          || (
+            managesRestaurant(request.resource.data.restaurantId)
+            && request.resource.data.get('isWalkIn', false) == true
+            && request.resource.data.get('userId', '') == ''
+          )
+        );
 
       // Diners may change their own booking but never reassign its owner.
       allow update: if isSignedIn() && (

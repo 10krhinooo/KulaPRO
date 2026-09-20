@@ -25,12 +25,16 @@ fun StatusBadge(status: ReservationStatus, modifier: Modifier = Modifier) {
 
     val targetContainer = when (status) {
         ReservationStatus.CONFIRMED -> scheme.primaryContainer
+        // Seated is the one state the restaurant is in the middle of, so it gets the
+        // tertiary colour rather than sharing confirmed's.
+        ReservationStatus.SEATED -> scheme.tertiaryContainer
         ReservationStatus.PENDING -> scheme.secondaryContainer
         ReservationStatus.COMPLETED -> scheme.surfaceVariant
         ReservationStatus.CANCELLED, ReservationStatus.NO_SHOW -> scheme.errorContainer
     }
     val targetContent = when (status) {
         ReservationStatus.CONFIRMED -> scheme.onPrimaryContainer
+        ReservationStatus.SEATED -> scheme.onTertiaryContainer
         ReservationStatus.PENDING -> scheme.onSecondaryContainer
         ReservationStatus.COMPLETED -> scheme.onSurfaceVariant
         ReservationStatus.CANCELLED, ReservationStatus.NO_SHOW -> scheme.onErrorContainer
@@ -68,6 +72,7 @@ private val ReservationStatus.label: String
     get() = when (this) {
         ReservationStatus.PENDING -> "Pending"
         ReservationStatus.CONFIRMED -> "Confirmed"
+        ReservationStatus.SEATED -> "Seated"
         ReservationStatus.CANCELLED -> "Cancelled"
         ReservationStatus.COMPLETED -> "Completed"
         ReservationStatus.NO_SHOW -> "Missed"

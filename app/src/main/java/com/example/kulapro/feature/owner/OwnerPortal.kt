@@ -38,7 +38,7 @@ import java.util.Calendar
 import java.util.Date
 import kotlinx.coroutines.launch
 
-private enum class OwnerScreen { DASHBOARD, EDIT }
+private enum class OwnerScreen { DASHBOARD, BOOKINGS, EDIT }
 
 /**
  * The restaurant side of the app.
@@ -83,6 +83,16 @@ fun OwnerPortal(
             is Result.Success -> bookings = result.data
             is Result.Failure -> loadError = loadError ?: result.message
         }
+    }
+
+    // Bookings brings its own chrome, so it replaces this screen rather than nesting inside
+    // it and producing two stacked app bars.
+    if (screen == OwnerScreen.BOOKINGS) {
+        OwnerBookingsScreen(
+            onBack = { screen = OwnerScreen.DASHBOARD },
+            modifier = modifier,
+        )
+        return
     }
 
     Scaffold(
@@ -131,7 +141,7 @@ fun OwnerPortal(
                     restaurant = current,
                     todaysBookings = bookings,
                     onEditRestaurant = { screen = OwnerScreen.EDIT },
-                    onViewBookings = { screen = OwnerScreen.DASHBOARD },
+                    onViewBookings = { screen = OwnerScreen.BOOKINGS },
                 )
 
                 else -> EditRestaurantScreen(
