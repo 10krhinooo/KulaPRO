@@ -176,6 +176,19 @@ fun LoginPage(
                     onClick = { navController.navigate(Routes.REGISTER) },
                     enabled = !isSubmitting,
                 )
+
+                // Browsing needs no account, so this screen must never be a dead end. It is
+                // reachable with an empty back stack after signing out, where popping would
+                // do nothing at all.
+                TextButton(
+                    onClick = {
+                        navController.navigate(Routes.HOME) {
+                            popUpTo(Routes.HOME) { inclusive = true }
+                        }
+                    },
+                    enabled = !isSubmitting,
+                    modifier = Modifier.fillMaxWidth(),
+                ) { Text("Continue as a guest") }
             }
         }
     }

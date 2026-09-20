@@ -279,7 +279,9 @@ fun ProfilePage(
                 text = "Sign out",
                 onClick = {
                     authRepository.signOut()
-                    navController.navigate(Routes.LOGIN) {
+                    // Signing out returns the user to browsing as a guest rather than to a
+                    // sign-in wall they cannot get past.
+                    navController.navigate(Routes.HOME) {
                         popUpTo(navController.graph.id) { inclusive = true }
                     }
                 },

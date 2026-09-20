@@ -7,7 +7,11 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -19,13 +23,27 @@ import com.example.kulapro.BuildConfig
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun AboutScreen(modifier: Modifier = Modifier) {
+fun AboutScreen(onBack: () -> Unit, modifier: Modifier = Modifier) {
     Scaffold(
         modifier = modifier,
         // Insets are owned by the navigation Scaffold; applying them again here would
         // double count the navigation bar height.
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
-        topBar = { TopAppBar(title = { Text("About") }) },
+        topBar = {
+            TopAppBar(
+                title = { Text("About") },
+                // About sits outside the tabs, so the bottom bar is hidden here and this is
+                // the only way back other than the system gesture.
+                navigationIcon = {
+                    IconButton(onClick = onBack) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Rounded.ArrowBack,
+                            contentDescription = "Back",
+                        )
+                    }
+                },
+            )
+        },
     ) { padding ->
         Column(
             modifier = Modifier

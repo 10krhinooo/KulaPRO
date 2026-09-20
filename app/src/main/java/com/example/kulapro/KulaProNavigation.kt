@@ -29,7 +29,6 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.navigation.NavController
-import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
@@ -242,7 +241,7 @@ fun KulaProNavigation(
                     onSignIn = { navController.navigate(Routes.login(next = Routes.PROFILE)) },
                 )
             }
-            composable(Routes.ABOUT) { AboutScreen() }
+            composable(Routes.ABOUT) { AboutScreen(onBack = { navController.popBackStack() }) }
 
             composable(
                 route = Routes.OWNER,
@@ -263,7 +262,11 @@ fun KulaProNavigation(
                     navController = navController,
                     onSignOut = {
                         authRepository.signOut()
-                        navController.navigate(Routes.LOGIN) {
+                        // Back to browsing, not to a sign-in wall. Sending a signed out user
+                        // to Login left them stranded: the graph had been cleared, so the
+                        // screen had nothing to go back to and no way into the app except
+                        // signing in again.
+                        navController.navigate(Routes.HOME) {
                             popUpTo(navController.graph.id) { inclusive = true }
                         }
                     },
@@ -318,12 +321,18 @@ private fun BottomNavigationBar(navController: NavController, currentRoute: Stri
                 selected = selected,
                 onClick = {
                     if (currentRoute == tab.route) return@NavigationBarItem
+                    // Popping back to the start destination rather than to its id: the id
+                    // form silently does nothing when that destination is not on the back
+                    // stack, which is how signing out could leave Home unreachable and the
+                    // user stranded between Reservations and Profile.
+                    //
+                    // No saveState or restoreState. Each tab is a single screen with no
+                    // stack of its own worth preserving, and restoring saved state on the
+                    // way to the start destination puts back the very entry just popped,
+                    // so the tap appears to do nothing.
                     navController.navigate(tab.route) {
-                        popUpTo(navController.graph.findStartDestination().id) {
-                            saveState = true
-                        }
+                        popUpTo(Routes.HOME) { inclusive = tab.route == Routes.HOME }
                         launchSingleTop = true
-                        restoreState = true
                     }
                 },
             )
