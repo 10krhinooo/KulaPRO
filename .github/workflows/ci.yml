@@ -23,6 +23,11 @@ jobs:
           distribution: temurin
           java-version: ${{ env.JAVA_VERSION }}
       - uses: android-actions/setup-android@v3
+        with:
+          # The action installs the long removed "tools" package by default and fails on
+          # it. AGP downloads the platform and build tools it needs, so nothing else is
+          # required here beyond an accepted licence and ANDROID_HOME on the path.
+          packages: ''
       - uses: gradle/actions/setup-gradle@v4
       - run: ./gradlew assembleDebug
 
@@ -36,6 +41,11 @@ jobs:
           distribution: temurin
           java-version: ${{ env.JAVA_VERSION }}
       - uses: android-actions/setup-android@v3
+        with:
+          # The action installs the long removed "tools" package by default and fails on
+          # it. AGP downloads the platform and build tools it needs, so nothing else is
+          # required here beyond an accepted licence and ANDROID_HOME on the path.
+          packages: ''
       - uses: gradle/actions/setup-gradle@v4
       # koverVerify fails the build below the 90% bound on the logic layers.
       - run: ./gradlew testDebugUnitTest koverXmlReport koverVerify
@@ -62,6 +72,11 @@ jobs:
           distribution: temurin
           java-version: ${{ env.JAVA_VERSION }}
       - uses: android-actions/setup-android@v3
+        with:
+          # The action installs the long removed "tools" package by default and fails on
+          # it. AGP downloads the platform and build tools it needs, so nothing else is
+          # required here beyond an accepted licence and ANDROID_HOME on the path.
+          packages: ''
       - uses: gradle/actions/setup-gradle@v4
       - run: ./gradlew lintDebug detekt
       - name: Upload lint report
