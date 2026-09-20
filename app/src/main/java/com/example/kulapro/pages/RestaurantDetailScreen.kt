@@ -1,6 +1,7 @@
 package com.example.kulapro.pages
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -45,6 +46,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
@@ -56,15 +59,15 @@ import com.example.kulapro.data.repository.RestaurantRepositoryFirestore
 import com.example.kulapro.data.repository.Result
 import com.example.kulapro.data.repository.ReviewRepository
 import com.example.kulapro.data.repository.ReviewRepositoryFirestore
-import androidx.compose.ui.res.painterResource
 import com.example.kulapro.ui.components.AnimatedListItem
 import com.example.kulapro.ui.components.MessageHost
-import com.example.kulapro.ui.components.cuisinePhoto
 import com.example.kulapro.ui.components.PrimaryButton
 import com.example.kulapro.ui.components.RatingBar
 import com.example.kulapro.ui.components.SecondaryButton
 import com.example.kulapro.ui.components.ShimmerBox
+import com.example.kulapro.ui.components.cuisinePhoto
 import com.example.kulapro.ui.components.rememberMessageHostState
+import com.example.kulapro.util.openMapPin
 import java.text.DateFormat
 import java.text.NumberFormat
 import java.util.Currency
@@ -177,7 +180,19 @@ fun RestaurantDetailScreen(
                 }
             }
 
-            item { Section(title = "Good to know") { RestaurantFacts(loaded) } }
+            item {
+                Section(title = "Good to know") {
+                    RestaurantFacts(
+                        restaurant = loaded,
+                        onNoMapApp = {
+                            messages.showError(
+                                "There is no map app on this device to open that in. The " +
+                                    "address is above if you want to copy it.",
+                            )
+                        },
+                    )
+                }
+            }
 
             item {
                 Section(title = if (menu.isEmpty()) "Menu" else "Menu (${menu.size})") {
@@ -349,10 +364,27 @@ private fun DetailSummary(restaurant: Restaurant) {
 }
 
 @Composable
-private fun RestaurantFacts(restaurant: Restaurant) {
+private fun RestaurantFacts(restaurant: Restaurant, onNoMapApp: () -> Unit) {
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        if (restaurant.address.isNotBlank()) {
-            Fact(Icons.Rounded.Place, restaurant.address)
+        if (restaurant.address.isNotBlank() || restaurant.location != null) {
+            val context = LocalContext.current
+            Fact(
+                icon = Icons.Rounded.Place,
+                text = restaurant.address.ifBlank { "Show on the map" },
+                // Hands the pin to the phone's map app, which already knows where the user
+                // is and how they like to get about.
+                onClick = {
+                    val opened = openMapPin(
+                        context = context,
+                        location = restaurant.location,
+                        label = restaurant.name,
+                        address = restaurant.address,
+                    )
+                    if (!opened) {
+                        onNoMapApp()
+                    }
+                },
+            )
         }
         if (restaurant.phone.isNotBlank()) {
             Fact(Icons.Rounded.Call, restaurant.phone)
@@ -387,10 +419,19 @@ private fun RestaurantFacts(restaurant: Restaurant) {
 }
 
 @Composable
-private fun Fact(icon: androidx.compose.ui.graphics.vector.ImageVector, text: String) {
+private fun Fact(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    text: String,
+    onClick: (() -> Unit)? = null,
+) {
     Row(
         horizontalArrangement = Arrangement.spacedBy(12.dp),
         verticalAlignment = Alignment.CenterVertically,
+        modifier = if (onClick == null) {
+            Modifier
+        } else {
+            Modifier.fillMaxWidth().clickable(onClick = onClick)
+        },
     ) {
         Icon(
             imageVector = icon,
@@ -398,7 +439,20 @@ private fun Fact(icon: androidx.compose.ui.graphics.vector.ImageVector, text: St
             modifier = Modifier.size(20.dp),
             tint = MaterialTheme.colorScheme.primary,
         )
-        Text(text = text, style = MaterialTheme.typography.bodyMedium)
+        Text(
+            text = text,
+            style = MaterialTheme.typography.bodyMedium,
+            modifier = Modifier.weight(1f),
+        )
+        // Only shown when the row does something, so a tappable row never looks like a
+        // label and a label never looks tappable.
+        if (onClick != null) {
+            Text(
+                text = "Directions",
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.primary,
+            )
+        }
     }
 }
 
