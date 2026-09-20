@@ -110,6 +110,7 @@ dependencies {
     ksp(libs.hilt.compiler)
 
     // Settings that survive a reinstall, and reminders that fire without a server.
+    implementation(libs.androidx.core.splashscreen)
     implementation(libs.androidx.datastore.preferences)
     implementation(libs.androidx.work.runtime.ktx)
     implementation(libs.androidx.hilt.work)
