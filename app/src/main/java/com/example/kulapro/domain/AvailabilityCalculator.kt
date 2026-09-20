@@ -14,8 +14,6 @@ import java.util.Date
  */
 object AvailabilityCalculator {
 
-    private const val HOURS_PER_DAY = 24
-    private const val MINUTES_PER_HOUR = 60
     private const val MILLIS_PER_SECOND = 1000
 
     data class Slot(
@@ -52,36 +50,8 @@ object AvailabilityCalculator {
         }
     }
 
-    private data class OpeningHours(val openMinutes: Int, val closeMinutes: Int)
-
-    private fun openingHoursFor(restaurant: Restaurant, day: Date): OpeningHours? {
-        val calendar = Calendar.getInstance().apply { time = day }
-        val dayName = when (calendar.get(Calendar.DAY_OF_WEEK)) {
-            Calendar.MONDAY -> "monday"
-            Calendar.TUESDAY -> "tuesday"
-            Calendar.WEDNESDAY -> "wednesday"
-            Calendar.THURSDAY -> "thursday"
-            Calendar.FRIDAY -> "friday"
-            Calendar.SATURDAY -> "saturday"
-            else -> "sunday"
-        }
-        val raw = restaurant.openingHours[dayName] ?: return null
-        val parts = raw.split("-")
-        if (parts.size != 2) return null
-        val open = parseMinutes(parts[0]) ?: return null
-        val close = parseMinutes(parts[1]) ?: return null
-        if (close <= open) return null
-        return OpeningHours(open, close)
-    }
-
-    private fun parseMinutes(value: String): Int? {
-        val segments = value.trim().split(":")
-        if (segments.size != 2) return null
-        val hour = segments[0].toIntOrNull() ?: return null
-        val minute = segments[1].toIntOrNull() ?: return null
-        if (hour !in 0..<HOURS_PER_DAY || minute !in 0..<MINUTES_PER_HOUR) return null
-        return hour * 60 + minute
-    }
+    private fun openingHoursFor(restaurant: Restaurant, day: Date): OpeningHours? =
+        OpeningHours.parseRange(restaurant.openingHours[OpeningHours.dayKeyFor(day)])
 
     private fun generateSlots(
         day: Date,
