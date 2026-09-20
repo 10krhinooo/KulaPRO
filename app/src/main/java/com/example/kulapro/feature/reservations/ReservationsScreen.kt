@@ -67,6 +67,7 @@ import java.util.Locale
 @Composable
 fun ReservationsScreen(
     onSignIn: () -> Unit,
+    onOpenReservation: (String) -> Unit,
     navController: NavController,
     modifier: Modifier = Modifier,
     viewModel: ReservationsViewModel = hiltViewModel(),
@@ -168,6 +169,7 @@ fun ReservationsScreen(
                 else -> ReservationList(
                     state = state,
                     entryAnimator = entryAnimator,
+                    onOpen = onOpenReservation,
                     onCancel = viewModel::cancel,
                     onReview = viewModel::startReview,
                 )
@@ -180,6 +182,7 @@ fun ReservationsScreen(
 private fun ReservationList(
     state: ReservationsUiState,
     entryAnimator: com.example.kulapro.ui.components.ListEntryAnimator,
+    onOpen: (String) -> Unit,
     onCancel: (Reservation) -> Unit,
     onReview: (Reservation) -> Unit,
 ) {
@@ -204,6 +207,7 @@ private fun ReservationList(
                     timeLabel = dateFormat.format(leading.startsAt.toDate()),
                     isBusy = state.busyReservationId == leading.id,
                     canCancel = state.canChange(leading),
+                    onOpen = { onOpen(leading.id) },
                     onCancel = { onCancel(leading) },
                 )
             }
@@ -224,10 +228,9 @@ private fun ReservationList(
             AnimatedListItem(index = index, key = reservation.id, animator = entryAnimator) {
                 ReservationRow(
                     reservation = reservation,
+                    state = state,
                     timeLabel = dateFormat.format(reservation.startsAt.toDate()),
-                    isBusy = state.busyReservationId == reservation.id,
-                    canCancel = state.canChange(reservation),
-                    canReview = state.canReview(reservation),
+                    onOpen = { onOpen(reservation.id) },
                     onCancel = { onCancel(reservation) },
                     onReview = { onReview(reservation) },
                 )
@@ -249,6 +252,7 @@ private fun NextBookingCard(
     timeLabel: String,
     isBusy: Boolean,
     canCancel: Boolean,
+    onOpen: () -> Unit,
     onCancel: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -256,6 +260,9 @@ private fun NextBookingCard(
         modifier = modifier.fillMaxWidth(),
         shape = MaterialTheme.shapes.large,
         color = MaterialTheme.colorScheme.primaryContainer,
+        // The whole card opens the booking. The cancel button inside it is its own target,
+        // so tapping the card never cancels anything by accident.
+        onClick = onOpen,
     ) {
         Column(
             modifier = Modifier.padding(20.dp),
@@ -309,10 +316,12 @@ private fun NextBookingCard(
 @Composable
 private fun ReservationRow(
     reservation: Reservation,
+    // The state rather than three booleans lifted out of it. Whether a booking can be
+    // cancelled or reviewed is one question with one answer, and asking it here keeps the
+    // row and the screen from ever disagreeing about it.
+    state: ReservationsUiState,
     timeLabel: String,
-    isBusy: Boolean,
-    canCancel: Boolean,
-    canReview: Boolean,
+    onOpen: () -> Unit,
     onCancel: () -> Unit,
     onReview: () -> Unit,
     modifier: Modifier = Modifier,
@@ -321,6 +330,7 @@ private fun ReservationRow(
         modifier = modifier.fillMaxWidth(),
         shape = MaterialTheme.shapes.medium,
         color = MaterialTheme.colorScheme.surfaceVariant,
+        onClick = onOpen,
     ) {
         Column(
             modifier = Modifier.padding(16.dp),
@@ -346,11 +356,16 @@ private fun ReservationRow(
             )
 
             when {
-                isBusy -> CircularProgressIndicator(modifier = Modifier.size(20.dp))
-                canCancel -> TextButton(onClick = onCancel) { Text("Cancel booking") }
+                state.busyReservationId == reservation.id ->
+                    CircularProgressIndicator(modifier = Modifier.size(20.dp))
+
+                state.canChange(reservation) ->
+                    TextButton(onClick = onCancel) { Text("Cancel booking") }
+
                 // Only a completed visit can be reviewed, which mirrors what the security
                 // rules accept, so the button never leads to a rejected write.
-                canReview -> TextButton(onClick = onReview) { Text("Leave a review") }
+                state.canReview(reservation) ->
+                    TextButton(onClick = onReview) { Text("Leave a review") }
             }
         }
     }

@@ -18,12 +18,16 @@ object Routes {
     const val LIST_RESTAURANT = "listRestaurant"
     const val OWNERSHIP_REVIEW = "ownershipReview"
     const val SEARCH = "search"
+    /** One booking in full. Named "booking" so it cannot collide with the tab route. */
+    const val BOOKING = "booking/{reservationId}"
     const val SCANNER = "scanner?restaurantId={restaurantId}&menuItemId={menuItemId}"
 
     fun claimRestaurant(restaurantId: String, restaurantName: String): String =
         "claim/$restaurantId/${encode(restaurantName)}"
 
     fun restaurant(restaurantId: String): String = "restaurant/$restaurantId"
+
+    fun booking(reservationId: String): String = "booking/$reservationId"
 
     /**
      * The admin side, optionally for a particular restaurant.

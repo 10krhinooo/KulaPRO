@@ -42,6 +42,7 @@ import com.example.kulapro.data.repository.Result
 import com.example.kulapro.feature.owner.OwnerPortal
 import com.example.kulapro.feature.ownership.OwnershipRequestScreen
 import com.example.kulapro.feature.home.SearchScreen
+import com.example.kulapro.feature.reservations.ReservationDetailScreen
 import com.example.kulapro.feature.reservations.ReservationsScreen
 import com.example.kulapro.feature.ownership.OwnershipReviewScreen
 import com.example.kulapro.feature.scanner.ScannerScreen
@@ -214,6 +215,17 @@ fun KulaProNavigation(
                 )
             }
 
+            composable(
+                route = Routes.BOOKING,
+                arguments = listOf(navArgument("reservationId") { type = NavType.StringType }),
+            ) { entry ->
+                ReservationDetailScreen(
+                    reservationId = entry.arguments?.getString("reservationId").orEmpty(),
+                    onBack = { navController.popBackStack() },
+                    onOpenRestaurant = { navController.navigate(Routes.restaurant(it)) },
+                )
+            }
+
             composable(Routes.SEARCH) {
                 SearchScreen(
                     onBack = { navController.popBackStack() },
@@ -305,6 +317,7 @@ fun KulaProNavigation(
             composable(Routes.RESERVATIONS) {
                 ReservationsScreen(
                     navController = navController,
+                    onOpenReservation = { navController.navigate(Routes.booking(it)) },
                     onSignIn = {
                         navController.navigate(Routes.login(next = Routes.RESERVATIONS))
                     },
