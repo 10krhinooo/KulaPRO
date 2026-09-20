@@ -28,7 +28,6 @@ class OwnerPortalViewModelTest {
     private val dispatcher = StandardTestDispatcher()
     private lateinit var owner: FakeOwnerRepository
     private lateinit var restaurants: FakeRestaurantRepository
-    private lateinit var claims: FakeClaimsRepository
 
     @Before
     fun setUp() {
@@ -37,7 +36,6 @@ class OwnerPortalViewModelTest {
         restaurants = FakeRestaurantRepository(
             restaurant = Restaurant(id = "r1", name = "The Bistro", capacityPerSlot = 40),
         )
-        claims = FakeClaimsRepository()
     }
 
     @After
@@ -46,7 +44,6 @@ class OwnerPortalViewModelTest {
     private fun viewModel(restaurantId: String = "r1") = OwnerPortalViewModel(
         restaurantRepository = restaurants,
         ownerRepository = owner,
-        claimsRepository = claims,
         savedStateHandle = SavedStateHandle(
             mapOf(OwnerBookingsViewModel.ARG_RESTAURANT_ID to restaurantId),
         ),
@@ -57,56 +54,9 @@ class OwnerPortalViewModelTest {
         val viewModel = viewModel()
         advanceUntilIdle()
 
-        assertEquals(AdminSection.TODAY, viewModel.state.value.section)
+        assertEquals(OwnerSection.TODAY, viewModel.state.value.section)
         assertEquals("The Bistro", viewModel.state.value.restaurant?.name)
     }
-
-    @Test
-    fun `an owner who does not review requests is not offered the requests tab`() =
-        runTest(dispatcher) {
-            val viewModel = viewModel()
-            advanceUntilIdle()
-
-            assertFalse(AdminSection.REQUESTS in viewModel.state.value.sections)
-            assertEquals(4, viewModel.state.value.sections.size)
-        }
-
-    @Test
-    fun `a reviewer is offered the requests tab alongside the rest`() = runTest(dispatcher) {
-        claims.isPlatformAdmin = true
-
-        val viewModel = viewModel()
-        advanceUntilIdle()
-
-        assertTrue(AdminSection.REQUESTS in viewModel.state.value.sections)
-        assertEquals(AdminSection.entries.size, viewModel.state.value.sections.size)
-    }
-
-    @Test
-    fun `a reviewer who hosts nothing opens straight onto the requests waiting on them`() =
-        runTest(dispatcher) {
-            claims.isPlatformAdmin = true
-
-            val viewModel = viewModel(restaurantId = "")
-            advanceUntilIdle()
-
-            assertEquals(AdminSection.REQUESTS, viewModel.state.value.section)
-            assertEquals(listOf(AdminSection.REQUESTS), viewModel.state.value.sections)
-            // Nothing was fetched for a restaurant that was never named.
-            assertNull(viewModel.state.value.restaurant)
-        }
-
-    @Test
-    fun `a claim that cannot be read is treated as not holding the role`() =
-        runTest(dispatcher) {
-            claims.failure = "Your session expired."
-
-            val viewModel = viewModel()
-            advanceUntilIdle()
-
-            assertFalse(viewModel.state.value.isReviewer)
-            assertFalse(AdminSection.REQUESTS in viewModel.state.value.sections)
-        }
 
     @Test
     fun `today's bookings are loaded for the dashboard`() = runTest(dispatcher) {
@@ -152,9 +102,9 @@ class OwnerPortalViewModelTest {
         advanceUntilIdle()
 
         viewModel.editListing()
-        viewModel.selectSection(AdminSection.MENU)
+        viewModel.selectSection(OwnerSection.MENU)
 
-        assertEquals(AdminSection.MENU, viewModel.state.value.section)
+        assertEquals(OwnerSection.MENU, viewModel.state.value.section)
         assertFalse(viewModel.state.value.isEditingListing)
     }
 

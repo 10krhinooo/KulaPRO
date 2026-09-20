@@ -9,8 +9,9 @@ import com.example.kulapro.data.repository.ReservationRepository
 import com.example.kulapro.data.repository.RestaurantRepository
 import com.example.kulapro.data.repository.Result
 import com.example.kulapro.data.settings.SettingsRepository
-import com.example.kulapro.feature.reminders.BookingReminderScheduler
 import com.example.kulapro.domain.AvailabilityCalculator
+import com.example.kulapro.domain.startOfDay
+import com.example.kulapro.feature.reminders.BookingReminderScheduler
 import com.example.kulapro.ui.components.UiMessage
 import com.google.firebase.Timestamp
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -245,14 +246,6 @@ internal fun upcomingDays(count: Int, from: Date): List<Date> {
         calendar.time.also { calendar.add(Calendar.DAY_OF_YEAR, 1) }
     }
 }
-
-internal fun startOfDay(date: Date): Date = Calendar.getInstance().apply {
-    time = date
-    set(Calendar.HOUR_OF_DAY, 0)
-    set(Calendar.MINUTE, 0)
-    set(Calendar.SECOND, 0)
-    set(Calendar.MILLISECOND, 0)
-}.time
 
 private const val DAY_MILLIS = 24L * 60 * 60 * 1000
 private const val MILLIS_PER_SECOND = 1000L

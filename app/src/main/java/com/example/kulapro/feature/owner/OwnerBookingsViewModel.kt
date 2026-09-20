@@ -8,7 +8,7 @@ import com.example.kulapro.data.model.ReservationStatus
 import com.example.kulapro.data.repository.OwnerRepository
 import com.example.kulapro.data.repository.RestaurantRepository
 import com.example.kulapro.data.repository.Result
-import com.example.kulapro.feature.booking.startOfDay
+import com.example.kulapro.domain.startOfDay
 import com.example.kulapro.feature.booking.upcomingDays
 import com.example.kulapro.ui.components.UiMessage
 import com.google.firebase.Timestamp

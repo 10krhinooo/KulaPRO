@@ -56,7 +56,11 @@ service cloud.firestore {
     // ---- users ---------------------------------------------------------------
 
     match /users/{userId} {
-      allow read: if isSelf(userId) || isPlatformAdmin();
+      // The platform check is first on purpose. A rule is evaluated against a query before
+      // the query runs, and a condition that depends on the document being read cannot be
+      // proved for a collection the caller has not filtered. Leading with a condition that
+      // depends only on the caller is what lets an admin count registered accounts at all.
+      allow read: if isPlatformAdmin() || isSelf(userId);
 
       // On create the role must be the default. On update it must not change.
       // Privilege is granted only by a Cloud Function setting a custom claim.
@@ -184,8 +188,8 @@ service cloud.firestore {
     match /ownershipRequests/{requestId} {
       // A requester sees their own, a reviewer sees all of them. Nobody else sees any:
       // these carry a phone number and a stated connection to a business.
-      allow read: if isSignedIn() && (
-        resource.data.userId == request.auth.uid || isPlatformAdmin()
+      allow read: if isPlatformAdmin() || (
+        isSignedIn() && resource.data.userId == request.auth.uid
       );
 
       // Anyone signed in may ask. The request is a statement, not a grant, and asking is
@@ -211,9 +215,14 @@ service cloud.firestore {
     // ---- reservations --------------------------------------------------------
 
     match /reservations/{reservationId} {
-      allow read: if isSignedIn() && (
-        resource.data.userId == request.auth.uid ||
-        managesRestaurant(resource.data.restaurantId)
+      // Platform first, again so the admin console can ask about every booking at once
+      // rather than one restaurant at a time. A diner still only ever sees their own, and a
+      // restaurant only the bookings made with it.
+      allow read: if isPlatformAdmin() || (
+        isSignedIn() && (
+          resource.data.userId == request.auth.uid ||
+          managesRestaurant(resource.data.restaurantId)
+        )
       );
 
       // userId is pinned to the caller, so a client cannot book on someone else's behalf

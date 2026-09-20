@@ -3,12 +3,8 @@ package com.example.kulapro.di
 import com.example.kulapro.data.repository.AuthRepository
 import com.example.kulapro.data.repository.AuthRepositoryFirebase
 import com.example.kulapro.data.repository.ClaimsRepository
-import com.example.kulapro.data.repository.OwnerRepository
-import com.example.kulapro.data.repository.OwnerRepositoryFirestore
-import com.example.kulapro.data.repository.OwnershipRepository
 import com.example.kulapro.data.repository.FavouritesRepository
 import com.example.kulapro.data.repository.FavouritesRepositoryFirestore
-import com.example.kulapro.data.repository.OwnershipRepositoryFirestore
 import com.example.kulapro.data.repository.ProfileRepository
 import com.example.kulapro.data.repository.ReservationRepository
 import com.example.kulapro.data.repository.ReservationRepositoryFirestore
@@ -27,10 +23,11 @@ import dagger.hilt.components.SingletonComponent
 import javax.inject.Singleton
 
 /**
- * Binds the repository interfaces to their Firebase implementations.
+ * Binds the diner-facing repository interfaces to their Firebase implementations.
  *
- * Only the interfaces are exposed, so nothing above this layer names Firebase. Swapping in
- * a different backend, or a fake for a test, is a change to this file alone.
+ * Only the interfaces are exposed, so nothing above this layer names Firebase. The
+ * restaurant and platform sides are bound in [ManagementModule], which keeps the two halves
+ * of the app apart here as well as on screen.
  */
 @Module
 @InstallIn(SingletonComponent::class)
@@ -74,19 +71,6 @@ object RepositoryModule {
         firestore: FirebaseFirestore,
         auth: FirebaseAuth,
     ): FavouritesRepository = FavouritesRepositoryFirestore(firestore, auth)
-
-    @Provides
-    @Singleton
-    fun ownerRepository(
-        firestore: FirebaseFirestore,
-    ): OwnerRepository = OwnerRepositoryFirestore(firestore)
-
-    @Provides
-    @Singleton
-    fun ownershipRepository(
-        firestore: FirebaseFirestore,
-        auth: FirebaseAuth,
-    ): OwnershipRepository = OwnershipRepositoryFirestore(firestore, auth)
 
     /**
      * The scanner proxy, if this build was given one.

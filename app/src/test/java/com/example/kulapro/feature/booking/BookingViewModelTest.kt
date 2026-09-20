@@ -5,6 +5,7 @@ import com.example.kulapro.data.model.Restaurant
 import com.example.kulapro.data.model.RestaurantTable
 import com.example.kulapro.data.settings.FakeSettingsRepository
 import com.example.kulapro.data.model.SlotCount
+import com.example.kulapro.domain.startOfDay
 import io.mockk.mockk
 import java.util.Calendar
 import java.util.Date

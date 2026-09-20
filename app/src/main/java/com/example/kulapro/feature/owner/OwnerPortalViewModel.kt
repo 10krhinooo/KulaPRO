@@ -5,11 +5,10 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.kulapro.data.model.Reservation
 import com.example.kulapro.data.model.Restaurant
-import com.example.kulapro.data.repository.ClaimsRepository
 import com.example.kulapro.data.repository.OwnerRepository
 import com.example.kulapro.data.repository.RestaurantRepository
 import com.example.kulapro.data.repository.Result
-import com.example.kulapro.feature.booking.startOfDay
+import com.example.kulapro.domain.startOfDay
 import com.example.kulapro.ui.components.UiMessage
 import com.google.firebase.Timestamp
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -21,68 +20,42 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
-/** What the admin portal needs before it can decide which sections to offer. */
+/** What the restaurant portal is showing, for one restaurant. */
 data class OwnerPortalUiState(
-    val section: AdminSection = AdminSection.TODAY,
+    val section: OwnerSection = OwnerSection.TODAY,
     val restaurant: Restaurant? = null,
     val todaysBookings: List<Reservation> = emptyList(),
-    val isReviewer: Boolean = false,
-    /** Whether this portal was opened for a restaurant at all. */
-    val hostsARestaurant: Boolean = true,
     val isEditingListing: Boolean = false,
     val isSaving: Boolean = false,
     val loadError: String? = null,
     val message: UiMessage? = null,
-) {
-    /**
-     * The sections this user may actually open.
-     *
-     * Reviewing requests is a platform role rather than a restaurant one, so it appears only
-     * for the handful of accounts that hold it. Showing a tab the rules would refuse is a
-     * worse experience than not showing it at all.
-     */
-    val sections: List<AdminSection>
-        get() = AdminSection.entries.filter { section ->
-            when (section) {
-                AdminSection.REQUESTS -> isReviewer
-                else -> hostsARestaurant
-            }
-        }
-}
+)
 
 /**
  * The restaurant side of the app, in one place.
  *
- * Reached through the portal switcher, and offered only to users whose Auth claims name a
- * restaurant, so a diner never sees a door they cannot open.
+ * Reached from Profile, and offered only to users whose Auth claims name a restaurant, so a
+ * diner never sees a door they cannot open. The restaurant travels in the route, so this
+ * portal always has exactly one to run.
  */
 @HiltViewModel
 class OwnerPortalViewModel @Inject constructor(
     private val restaurantRepository: RestaurantRepository,
     private val ownerRepository: OwnerRepository,
-    private val claimsRepository: ClaimsRepository,
     savedStateHandle: SavedStateHandle,
 ) : ViewModel() {
 
     private val restaurantId: String =
         savedStateHandle.get<String>(OwnerBookingsViewModel.ARG_RESTAURANT_ID).orEmpty()
 
-    private val _state = MutableStateFlow(
-        OwnerPortalUiState(
-            hostsARestaurant = restaurantId.isNotBlank(),
-            // A reviewer who hosts nothing opens straight onto the only thing they can do
-            // here, rather than onto a dashboard for a restaurant that does not exist.
-            section = if (restaurantId.isBlank()) AdminSection.REQUESTS else AdminSection.TODAY,
-        ),
-    )
+    private val _state = MutableStateFlow(OwnerPortalUiState())
     val state: StateFlow<OwnerPortalUiState> = _state.asStateFlow()
 
     init {
-        if (restaurantId.isNotBlank()) refresh()
-        loadClaims()
+        refresh()
     }
 
-    fun selectSection(section: AdminSection) =
+    fun selectSection(section: OwnerSection) =
         _state.update { it.copy(section = section, isEditingListing = false) }
 
     fun editListing() = _state.update { it.copy(isEditingListing = true) }
@@ -118,14 +91,6 @@ class OwnerPortalViewModel @Inject constructor(
                 it.copy(message = UiMessage.error(result.message))
             }
         }
-    }
-
-    private fun loadClaims() = viewModelScope.launch {
-        val isReviewer = when (val result = claimsRepository.isPlatformAdmin()) {
-            is Result.Success -> result.data
-            is Result.Failure -> false
-        }
-        _state.update { it.copy(isReviewer = isReviewer) }
     }
 
     fun saveListing(restaurant: Restaurant) {

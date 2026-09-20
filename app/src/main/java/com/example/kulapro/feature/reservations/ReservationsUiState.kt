@@ -2,7 +2,7 @@ package com.example.kulapro.feature.reservations
 
 import com.example.kulapro.data.model.Reservation
 import com.example.kulapro.data.model.ReservationStatus
-import java.util.Calendar
+import com.example.kulapro.domain.calendarDaysBetween
 import java.util.Date
 import java.util.concurrent.TimeUnit
 
@@ -94,21 +94,5 @@ enum class ReservationTab(val label: String) {
     PAST("History"),
 }
 
-/** Whole days between two instants, counted by the date rather than by elapsed hours. */
-private fun calendarDaysBetween(from: Date, to: Date): Int {
-    val start = startOfDay(from)
-    val end = startOfDay(to)
-    return ((end.time - start.time) / MILLIS_PER_DAY).toInt()
-}
-
-private fun startOfDay(date: Date): Date = Calendar.getInstance().apply {
-    time = date
-    set(Calendar.HOUR_OF_DAY, 0)
-    set(Calendar.MINUTE, 0)
-    set(Calendar.SECOND, 0)
-    set(Calendar.MILLISECOND, 0)
-}.time
-
 private const val MINUTES_PER_HOUR = 60
 private const val DAYS_PER_WEEK = 7
-private const val MILLIS_PER_DAY = 24L * 60 * 60 * 1000

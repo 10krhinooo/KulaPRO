@@ -24,7 +24,6 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.kulapro.data.model.Restaurant
-import com.example.kulapro.feature.ownership.OwnershipReviewScreen
 import com.example.kulapro.ui.components.ErrorState
 import com.example.kulapro.ui.components.MessageBanner
 
@@ -51,7 +50,7 @@ fun OwnerPortal(
         },
         bottomBar = {
             NavigationBar {
-                state.sections.forEach { section ->
+                OwnerSection.entries.forEach { section ->
                     NavigationBarItem(
                         selected = section == state.section && !state.isEditingListing,
                         onClick = { viewModel.selectSection(section) },
@@ -59,8 +58,8 @@ fun OwnerPortal(
                         label = { Text(section.label) },
                     )
                 }
-                // The way out, always present. A reviewer who hosts no restaurant sees only
-                // one section, and without this the system back button was the only exit.
+                // The way out, always present. Without it the system back button was the
+                // only exit from the restaurant side.
                 NavigationBarItem(
                     selected = false,
                     onClick = onSwitchToCustomer,
@@ -85,38 +84,28 @@ fun OwnerPortal(
 
 @Composable
 private fun PortalSection(state: OwnerPortalUiState, viewModel: OwnerPortalViewModel) {
-    // Menu, setup and requests each read their own data and do not need the restaurant
+    // Menu, setup and bookings each read their own data and do not need the restaurant
     // document this screen is still fetching, so they are not held up behind it.
     when (state.section) {
-        AdminSection.MENU -> {
+        OwnerSection.MENU -> {
             MenuManagementScreen()
             return
         }
 
-        AdminSection.SETUP -> {
+        OwnerSection.SETUP -> {
             CapacitySetupScreen()
             return
         }
 
-        AdminSection.REQUESTS -> {
-            OwnershipReviewScreen()
-            return
-        }
-
-        AdminSection.BOOKINGS -> {
+        OwnerSection.BOOKINGS -> {
             OwnerBookingsScreen()
             return
         }
 
-        AdminSection.TODAY -> Unit
+        OwnerSection.TODAY -> Unit
     }
 
     val restaurant = state.restaurant
-    if (!state.hostsARestaurant) {
-        // A reviewer who manages no restaurant has nothing to show here, and the bar will
-        // not have offered this section in the first place.
-        return
-    }
     when {
         state.loadError != null && restaurant == null ->
             ErrorState(message = state.loadError, onRetry = viewModel::refresh)
@@ -134,7 +123,7 @@ private fun PortalSection(state: OwnerPortalUiState, viewModel: OwnerPortalViewM
             state = state,
             restaurant = restaurant,
             onEditRestaurant = viewModel::editListing,
-            onViewBookings = { viewModel.selectSection(AdminSection.BOOKINGS) },
+            onViewBookings = { viewModel.selectSection(OwnerSection.BOOKINGS) },
         )
     }
 }

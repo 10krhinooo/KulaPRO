@@ -39,12 +39,12 @@ import androidx.navigation.navArgument
 import com.example.kulapro.data.repository.AuthRepository
 import com.example.kulapro.data.repository.AuthRepositoryFirebase
 import com.example.kulapro.data.repository.Result
+import com.example.kulapro.feature.admin.AdminPortal
 import com.example.kulapro.feature.owner.OwnerPortal
 import com.example.kulapro.feature.ownership.OwnershipRequestScreen
 import com.example.kulapro.feature.home.SearchScreen
 import com.example.kulapro.feature.reservations.ReservationDetailScreen
 import com.example.kulapro.feature.reservations.ReservationsScreen
-import com.example.kulapro.feature.ownership.OwnershipReviewScreen
 import com.example.kulapro.feature.scanner.ScannerScreen
 import com.example.kulapro.pages.AboutScreen
 import com.example.kulapro.pages.ForgotPasswordScreen
@@ -109,6 +109,14 @@ fun KulaProNavigation(
             pendingAction = GatedAction(action = action, destination = destination)
         } else {
             navController.navigate(destination)
+        }
+    }
+
+    // Both portals leave the same way: back to browsing, with the portal dropped from the
+    // stack so the system back button does not walk straight back into it.
+    fun backToBrowsing() {
+        navController.navigate(Routes.HOME) {
+            popUpTo(Routes.HOME) { inclusive = true }
         }
     }
 
@@ -306,9 +314,6 @@ fun KulaProNavigation(
                 ScannerScreen(onBack = { navController.popBackStack() })
             }
 
-            composable(Routes.OWNERSHIP_REVIEW) {
-                OwnershipReviewScreen(onBack = { navController.popBackStack() })
-            }
             composable(Routes.RESERVATIONS) {
                 ReservationsScreen(
                     navController = navController,
@@ -330,7 +335,7 @@ fun KulaProNavigation(
                         { navController.navigate(Routes.owner(restaurantId)) }
                     },
                     onOpenAdmin = if (isReviewer) {
-                        { navController.navigate(Routes.owner("")) }
+                        { navController.navigate(Routes.ADMIN) }
                     } else {
                         null
                     },
@@ -340,20 +345,13 @@ fun KulaProNavigation(
 
             composable(
                 route = Routes.OWNER,
-                arguments = listOf(
-                    navArgument("restaurantId") {
-                        type = NavType.StringType
-                        defaultValue = ""
-                    },
-                ),
+                arguments = listOf(navArgument("restaurantId") { type = NavType.StringType }),
             ) {
-                OwnerPortal(
-                    onSwitchToCustomer = {
-                        navController.navigate(Routes.HOME) {
-                            popUpTo(Routes.HOME) { inclusive = true }
-                        }
-                    },
-                )
+                OwnerPortal(onSwitchToCustomer = ::backToBrowsing)
+            }
+
+            composable(Routes.ADMIN) {
+                AdminPortal(onSwitchToCustomer = ::backToBrowsing)
             }
 
             composable(Routes.SETTINGS) {

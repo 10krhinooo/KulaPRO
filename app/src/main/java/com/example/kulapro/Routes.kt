@@ -12,11 +12,11 @@ object Routes {
     const val PROFILE = "profile"
     const val SETTINGS = "settings"
     const val ABOUT = "about"
-    const val OWNER = "owner?restaurantId={restaurantId}"
+    const val OWNER = "owner/{restaurantId}"
+    const val ADMIN = "admin"
     const val RESTAURANT = "restaurant/{restaurantId}"
     const val CLAIM_RESTAURANT = "claim/{restaurantId}/{restaurantName}"
     const val LIST_RESTAURANT = "listRestaurant"
-    const val OWNERSHIP_REVIEW = "ownershipReview"
     const val SEARCH = "search"
     /** One booking in full. Named "booking" so it cannot collide with the tab route. */
     const val BOOKING = "booking/{reservationId}"
@@ -30,13 +30,12 @@ object Routes {
     fun booking(reservationId: String): String = "booking/$reservationId"
 
     /**
-     * The admin side, optionally for a particular restaurant.
+     * The restaurant side, for one restaurant.
      *
-     * The id is optional because a platform reviewer who hosts nothing still has an admin
-     * side: the ownership requests waiting on them.
+     * The id is required. Running the platform is a separate view with its own route, so
+     * there is no longer such a thing as the restaurant portal without a restaurant.
      */
-    fun owner(restaurantId: String): String =
-        if (restaurantId.isBlank()) "owner" else "owner?restaurantId=$restaurantId"
+    fun owner(restaurantId: String): String = "owner/$restaurantId"
 
     /**
      * The scanner, optionally asking about a particular dish on a menu.
