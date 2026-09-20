@@ -76,7 +76,11 @@ function daysAgo(days) {
 
 async function main() {
   console.log(`Seeding ${restaurants.length} restaurants into ${PROJECT_ID}`);
-  for (const { id, menu, location, ...rest } of restaurants) {
+  // floorPlan is pulled out here rather than written. It is a generator spec for the tables
+  // subcollection below, not a field of the restaurant, and writing it put a key on every
+  // document that the client has no model for. Firestore logged a warning per listing per
+  // load for it.
+  for (const { id, menu, location, floorPlan, ...rest } of restaurants) {
     await writeDoc(`restaurants/${id}`, {
       averageRating: 0,
       reviewCount: 0,
