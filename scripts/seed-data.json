@@ -2,29 +2,49 @@
   {
     "id": "the-bistro",
     "name": "The Bistro",
-    "description": "Neighbourhood European cooking, long lunches, short menu.",
+    "description": "Neighbourhood European cooking, long lunches, short menu. The kind of place where the waiter remembers what you drank last time.",
     "cuisine": "European",
     "priceBand": 3,
-    "address": "Westlands, Nairobi",
+    "address": "Woodvale Grove, Westlands, Nairobi",
     "phone": "+254700000001",
     "location": [
       -1.2649,
       36.8038
     ],
-    "capacityPerSlot": 24,
+    "capacityPerSlot": 52,
     "slotDurationMinutes": 90,
+    "averageRating": 4.6,
+    "reviewCount": 38,
     "menu": [
       {
         "name": "Steak frites",
         "description": "Sirloin, peppercorn sauce, thin fries",
         "priceCents": 185000,
-        "category": "Mains"
+        "category": "Mains",
+        "nutrition": {
+          "caloriesKcal": 920,
+          "proteinG": 52,
+          "carbsG": 61,
+          "fatG": 48
+        }
       },
       {
         "name": "French onion soup",
         "description": "Slow onions, gruyere crouton",
         "priceCents": 75000,
-        "category": "Starters"
+        "category": "Starters",
+        "nutrition": {
+          "caloriesKcal": 380,
+          "proteinG": 14,
+          "carbsG": 32,
+          "fatG": 21
+        }
+      },
+      {
+        "name": "Roast chicken",
+        "description": "Half bird, lemon and thyme, pan juices",
+        "priceCents": 145000,
+        "category": "Mains"
       },
       {
         "name": "Creme brulee",
@@ -32,22 +52,55 @@
         "priceCents": 65000,
         "category": "Desserts"
       }
+    ],
+    "floorPlan": [
+      {
+        "name": "Window",
+        "prefix": "W",
+        "rows": 1,
+        "columns": 4,
+        "seats": 2
+      },
+      {
+        "name": "Main floor",
+        "prefix": "M",
+        "rows": 2,
+        "columns": 4,
+        "seats": 4
+      },
+      {
+        "name": "Back room",
+        "prefix": "B",
+        "rows": 1,
+        "columns": 2,
+        "seats": 6
+      }
     ]
   },
   {
     "id": "sushi-den",
     "name": "Sushi Den",
-    "description": "Counter seating, daily fish, omakase on request.",
+    "description": "Counter seating, daily fish, omakase on request. Twelve seats, one chef, no substitutions.",
     "cuisine": "Japanese",
     "priceBand": 4,
-    "address": "Kilimani, Nairobi",
+    "address": "Argwings Kodhek Road, Kilimani, Nairobi",
     "phone": "+254700000002",
     "location": [
       -1.2921,
       36.7856
     ],
-    "capacityPerSlot": 16,
+    "capacityPerSlot": 22,
     "slotDurationMinutes": 120,
+    "averageRating": 4.8,
+    "reviewCount": 21,
+    "openingHours": {
+      "tuesday": "18:00-22:30",
+      "wednesday": "18:00-22:30",
+      "thursday": "18:00-22:30",
+      "friday": "18:00-23:00",
+      "saturday": "17:30-23:00",
+      "sunday": "17:30-21:30"
+    },
     "menu": [
       {
         "name": "Omakase set",
@@ -59,83 +112,714 @@
         "name": "Salmon nigiri",
         "description": "Two pieces",
         "priceCents": 60000,
-        "category": "Nigiri"
+        "category": "Nigiri",
+        "nutrition": {
+          "caloriesKcal": 140,
+          "proteinG": 11,
+          "carbsG": 16,
+          "fatG": 3
+        }
+      },
+      {
+        "name": "Chirashi bowl",
+        "description": "Assorted sashimi over seasoned rice",
+        "priceCents": 210000,
+        "category": "Bowls"
       },
       {
         "name": "Miso soup",
         "description": "White miso, tofu, spring onion",
         "priceCents": 35000,
-        "category": "Sides"
+        "category": "Sides",
+        "nutrition": {
+          "caloriesKcal": 84,
+          "proteinG": 6,
+          "carbsG": 8,
+          "fatG": 3
+        }
+      }
+    ],
+    "floorPlan": [
+      {
+        "name": "Counter",
+        "prefix": "C",
+        "rows": 1,
+        "columns": 6,
+        "seats": 1
+      },
+      {
+        "name": "Main floor",
+        "prefix": "M",
+        "rows": 2,
+        "columns": 3,
+        "seats": 2
+      },
+      {
+        "name": "Private",
+        "prefix": "P",
+        "rows": 1,
+        "columns": 1,
+        "seats": 4
       }
     ]
   },
   {
     "id": "the-grill",
     "name": "The Grill",
-    "description": "Open fire, big plates, built for sharing.",
+    "description": "Charcoal, smoke and patience. Nyama choma carved at the table, sides that keep up.",
     "cuisine": "Grill",
     "priceBand": 2,
-    "address": "Karen, Nairobi",
+    "address": "Ngong Road, Nairobi",
     "phone": "+254700000003",
     "location": [
-      -1.3194,
-      36.7073
+      -1.3005,
+      36.7625
     ],
-    "capacityPerSlot": 40,
+    "capacityPerSlot": 152,
     "slotDurationMinutes": 90,
+    "averageRating": 4.4,
+    "reviewCount": 112,
     "menu": [
       {
         "name": "Nyama choma platter",
-        "description": "Goat, beef, kachumbari, ugali",
-        "priceCents": 165000,
-        "category": "Mains"
+        "description": "Goat ribs by the kilo, kachumbari, ugali",
+        "priceCents": 180000,
+        "category": "Grill",
+        "nutrition": {
+          "caloriesKcal": 1120,
+          "proteinG": 78,
+          "carbsG": 64,
+          "fatG": 58
+        }
       },
       {
         "name": "Grilled tilapia",
-        "description": "Whole fish, lemon, chilli",
-        "priceCents": 140000,
-        "category": "Mains"
+        "description": "Whole fish, chilli and lime",
+        "priceCents": 135000,
+        "category": "Grill"
       },
       {
-        "name": "Chapati",
-        "description": "Two pieces",
-        "priceCents": 20000,
+        "name": "Mukimo",
+        "description": "Mashed potato, maize, greens",
+        "priceCents": 45000,
         "category": "Sides"
+      },
+      {
+        "name": "Kachumbari",
+        "description": "Tomato, red onion, coriander",
+        "priceCents": 30000,
+        "category": "Sides",
+        "nutrition": {
+          "caloriesKcal": 60,
+          "proteinG": 2,
+          "carbsG": 12,
+          "fatG": 1
+        }
+      }
+    ],
+    "floorPlan": [
+      {
+        "name": "Terrace",
+        "prefix": "T",
+        "rows": 2,
+        "columns": 5,
+        "seats": 6
+      },
+      {
+        "name": "Main floor",
+        "prefix": "M",
+        "rows": 3,
+        "columns": 5,
+        "seats": 4
+      },
+      {
+        "name": "Garden",
+        "prefix": "G",
+        "rows": 1,
+        "columns": 4,
+        "seats": 8
       }
     ]
   },
   {
     "id": "forno-pizza",
     "name": "Forno",
-    "description": "Wood-fired Neapolitan pizza, sixty second bake.",
+    "description": "Wood fired, ninety seconds a pizza, dough proved for two days.",
     "cuisine": "Italian",
     "priceBand": 2,
-    "address": "Lavington, Nairobi",
+    "address": "Karen Road, Karen, Nairobi",
     "phone": "+254700000004",
     "location": [
-      -1.2785,
-      36.7669
+      -1.3196,
+      36.7076
     ],
-    "capacityPerSlot": 32,
-    "slotDurationMinutes": 60,
+    "capacityPerSlot": 76,
+    "slotDurationMinutes": 75,
+    "averageRating": 4.3,
+    "reviewCount": 76,
     "menu": [
       {
         "name": "Margherita",
         "description": "San Marzano, fior di latte, basil",
         "priceCents": 95000,
-        "category": "Pizza"
+        "category": "Pizza",
+        "nutrition": {
+          "caloriesKcal": 760,
+          "proteinG": 30,
+          "carbsG": 92,
+          "fatG": 28
+        }
       },
       {
         "name": "Diavola",
         "description": "Spicy salami, chilli honey",
-        "priceCents": 115000,
+        "priceCents": 125000,
         "category": "Pizza"
       },
       {
+        "name": "Burrata",
+        "description": "With heritage tomato and olive oil",
+        "priceCents": 85000,
+        "category": "Starters"
+      },
+      {
         "name": "Tiramisu",
-        "description": "Espresso, mascarpone",
+        "description": "Made this morning",
+        "priceCents": 60000,
+        "category": "Desserts"
+      }
+    ],
+    "floorPlan": [
+      {
+        "name": "Window",
+        "prefix": "W",
+        "rows": 1,
+        "columns": 5,
+        "seats": 2
+      },
+      {
+        "name": "Main floor",
+        "prefix": "M",
+        "rows": 3,
+        "columns": 4,
+        "seats": 4
+      },
+      {
+        "name": "Terrace",
+        "prefix": "T",
+        "rows": 1,
+        "columns": 3,
+        "seats": 6
+      }
+    ]
+  },
+  {
+    "id": "mama-oliech",
+    "name": "Mama's Fish Shack",
+    "description": "Lake fish done the way it should be. Loud, busy, worth the wait.",
+    "cuisine": "Kenyan",
+    "priceBand": 2,
+    "address": "Marcus Garvey Road, Kilimani, Nairobi",
+    "phone": "+254700000005",
+    "location": [
+      -1.2974,
+      36.7833
+    ],
+    "capacityPerSlot": 108,
+    "slotDurationMinutes": 90,
+    "averageRating": 4.7,
+    "reviewCount": 203,
+    "menu": [
+      {
+        "name": "Whole fried tilapia",
+        "description": "With ugali and sukuma wiki",
+        "priceCents": 160000,
+        "category": "Mains",
+        "nutrition": {
+          "caloriesKcal": 880,
+          "proteinG": 62,
+          "carbsG": 74,
+          "fatG": 34
+        }
+      },
+      {
+        "name": "Fish stew",
+        "description": "Slow cooked in tomato and onion",
+        "priceCents": 140000,
+        "category": "Mains"
+      },
+      {
+        "name": "Sukuma wiki",
+        "description": "Collard greens, onion",
+        "priceCents": 25000,
+        "category": "Sides",
+        "nutrition": {
+          "caloriesKcal": 90,
+          "proteinG": 4,
+          "carbsG": 9,
+          "fatG": 5
+        }
+      }
+    ],
+    "floorPlan": [
+      {
+        "name": "Main floor",
+        "prefix": "M",
+        "rows": 3,
+        "columns": 5,
+        "seats": 4
+      },
+      {
+        "name": "Terrace",
+        "prefix": "T",
+        "rows": 2,
+        "columns": 4,
+        "seats": 6
+      }
+    ]
+  },
+  {
+    "id": "spice-route",
+    "name": "Spice Route",
+    "description": "North Indian cooking, tandoor going all evening, breads to order.",
+    "cuisine": "Indian",
+    "priceBand": 3,
+    "address": "Parklands Road, Parklands, Nairobi",
+    "phone": "+254700000006",
+    "location": [
+      -1.2611,
+      36.8172
+    ],
+    "capacityPerSlot": 88,
+    "slotDurationMinutes": 90,
+    "averageRating": 4.5,
+    "reviewCount": 64,
+    "menu": [
+      {
+        "name": "Butter chicken",
+        "description": "Tandoori chicken, tomato and cream",
+        "priceCents": 155000,
+        "category": "Mains",
+        "nutrition": {
+          "caloriesKcal": 690,
+          "proteinG": 44,
+          "carbsG": 22,
+          "fatG": 46
+        }
+      },
+      {
+        "name": "Dal makhani",
+        "description": "Black lentils, overnight",
+        "priceCents": 110000,
+        "category": "Mains",
+        "nutrition": {
+          "caloriesKcal": 420,
+          "proteinG": 18,
+          "carbsG": 48,
+          "fatG": 17
+        }
+      },
+      {
+        "name": "Garlic naan",
+        "description": "From the tandoor",
+        "priceCents": 35000,
+        "category": "Breads"
+      },
+      {
+        "name": "Gulab jamun",
+        "description": "Two pieces, warm syrup",
+        "priceCents": 50000,
+        "category": "Desserts"
+      }
+    ],
+    "floorPlan": [
+      {
+        "name": "Main floor",
+        "prefix": "M",
+        "rows": 3,
+        "columns": 5,
+        "seats": 4
+      },
+      {
+        "name": "Window",
+        "prefix": "W",
+        "rows": 1,
+        "columns": 4,
+        "seats": 2
+      },
+      {
+        "name": "Private",
+        "prefix": "P",
+        "rows": 1,
+        "columns": 2,
+        "seats": 10
+      }
+    ]
+  },
+  {
+    "id": "habesha-table",
+    "name": "Habesha Table",
+    "description": "Injera made in house, shared platters, coffee ceremony on request.",
+    "cuisine": "Ethiopian",
+    "priceBand": 2,
+    "address": "Lenana Road, Hurlingham, Nairobi",
+    "phone": "+254700000007",
+    "location": [
+      -1.2937,
+      36.7899
+    ],
+    "capacityPerSlot": 68,
+    "slotDurationMinutes": 105,
+    "averageRating": 4.6,
+    "reviewCount": 47,
+    "menu": [
+      {
+        "name": "Beyaynetu",
+        "description": "Vegetarian platter, seven stews on injera",
+        "priceCents": 130000,
+        "category": "Platters",
+        "nutrition": {
+          "caloriesKcal": 640,
+          "proteinG": 24,
+          "carbsG": 96,
+          "fatG": 18
+        }
+      },
+      {
+        "name": "Doro wat",
+        "description": "Chicken, berbere, boiled egg",
+        "priceCents": 150000,
+        "category": "Mains"
+      },
+      {
+        "name": "Tibs",
+        "description": "Sauteed beef, rosemary, onion",
+        "priceCents": 165000,
+        "category": "Mains"
+      }
+    ],
+    "floorPlan": [
+      {
+        "name": "Main floor",
+        "prefix": "M",
+        "rows": 2,
+        "columns": 4,
+        "seats": 4
+      },
+      {
+        "name": "Floor seating",
+        "prefix": "F",
+        "rows": 2,
+        "columns": 3,
+        "seats": 6
+      }
+    ]
+  },
+  {
+    "id": "swahili-plate",
+    "name": "Swahili Plate",
+    "description": "Coastal cooking inland. Coconut, tamarind and a lot of patience.",
+    "cuisine": "Swahili",
+    "priceBand": 2,
+    "address": "Diani Close, Lavington, Nairobi",
+    "phone": "+254700000008",
+    "location": [
+      -1.2795,
+      36.7681
+    ],
+    "capacityPerSlot": 56,
+    "slotDurationMinutes": 90,
+    "averageRating": 4.4,
+    "reviewCount": 31,
+    "menu": [
+      {
+        "name": "Biryani",
+        "description": "Slow cooked beef, spiced rice",
+        "priceCents": 125000,
+        "category": "Mains",
+        "nutrition": {
+          "caloriesKcal": 810,
+          "proteinG": 38,
+          "carbsG": 98,
+          "fatG": 28
+        }
+      },
+      {
+        "name": "Samaki wa kupaka",
+        "description": "Grilled fish in coconut sauce",
+        "priceCents": 170000,
+        "category": "Mains"
+      },
+      {
+        "name": "Viazi karai",
+        "description": "Battered potato, tamarind chutney",
+        "priceCents": 45000,
+        "category": "Snacks"
+      }
+    ],
+    "floorPlan": [
+      {
+        "name": "Main floor",
+        "prefix": "M",
+        "rows": 2,
+        "columns": 4,
+        "seats": 4
+      },
+      {
+        "name": "Courtyard",
+        "prefix": "C",
+        "rows": 2,
+        "columns": 3,
+        "seats": 4
+      }
+    ]
+  },
+  {
+    "id": "golden-wok",
+    "name": "Golden Wok",
+    "description": "Cantonese cooking, dim sum until three, a wok that never cools.",
+    "cuisine": "Chinese",
+    "priceBand": 3,
+    "address": "Riverside Drive, Nairobi",
+    "phone": "+254700000009",
+    "location": [
+      -1.2712,
+      36.7965
+    ],
+    "capacityPerSlot": 110,
+    "slotDurationMinutes": 90,
+    "averageRating": 4.2,
+    "reviewCount": 58,
+    "menu": [
+      {
+        "name": "Har gow",
+        "description": "Four prawn dumplings",
+        "priceCents": 70000,
+        "category": "Dim sum",
+        "nutrition": {
+          "caloriesKcal": 220,
+          "proteinG": 14,
+          "carbsG": 26,
+          "fatG": 6
+        }
+      },
+      {
+        "name": "Crispy duck",
+        "description": "Half duck, pancakes, hoisin",
+        "priceCents": 290000,
+        "category": "Mains"
+      },
+      {
+        "name": "Salt and pepper squid",
+        "description": "Chilli, spring onion",
+        "priceCents": 130000,
+        "category": "Mains"
+      }
+    ],
+    "floorPlan": [
+      {
+        "name": "Main floor",
+        "prefix": "M",
+        "rows": 4,
+        "columns": 5,
+        "seats": 4
+      },
+      {
+        "name": "Banquet",
+        "prefix": "B",
+        "rows": 1,
+        "columns": 3,
+        "seats": 10
+      }
+    ]
+  },
+  {
+    "id": "casa-tacos",
+    "name": "Casa Tacos",
+    "description": "Nixtamalised corn, small plates, a short and serious list of mezcal.",
+    "cuisine": "Mexican",
+    "priceBand": 2,
+    "address": "General Mathenge Drive, Westlands, Nairobi",
+    "phone": "+254700000010",
+    "location": [
+      -1.2592,
+      36.7942
+    ],
+    "capacityPerSlot": 54,
+    "slotDurationMinutes": 75,
+    "averageRating": 4.1,
+    "reviewCount": 29,
+    "openingHours": {
+      "wednesday": "16:00-23:00",
+      "thursday": "16:00-23:00",
+      "friday": "16:00-00:00",
+      "saturday": "12:00-00:00",
+      "sunday": "12:00-21:00"
+    },
+    "menu": [
+      {
+        "name": "Al pastor tacos",
+        "description": "Three, pineapple, coriander",
+        "priceCents": 95000,
+        "category": "Tacos",
+        "nutrition": {
+          "caloriesKcal": 540,
+          "proteinG": 28,
+          "carbsG": 48,
+          "fatG": 26
+        }
+      },
+      {
+        "name": "Elote",
+        "description": "Grilled corn, chilli, cotija",
+        "priceCents": 50000,
+        "category": "Sides"
+      },
+      {
+        "name": "Churros",
+        "description": "With chocolate",
         "priceCents": 55000,
         "category": "Desserts"
+      }
+    ],
+    "floorPlan": [
+      {
+        "name": "Bar",
+        "prefix": "B",
+        "rows": 1,
+        "columns": 6,
+        "seats": 1
+      },
+      {
+        "name": "Main floor",
+        "prefix": "M",
+        "rows": 2,
+        "columns": 5,
+        "seats": 4
+      },
+      {
+        "name": "Terrace",
+        "prefix": "T",
+        "rows": 1,
+        "columns": 4,
+        "seats": 2
+      }
+    ]
+  },
+  {
+    "id": "olive-and-thyme",
+    "name": "Olive and Thyme",
+    "description": "Levantine mezze, charcoal grill, everything meant for the middle of the table.",
+    "cuisine": "Levantine",
+    "priceBand": 3,
+    "address": "Peponi Road, Westlands, Nairobi",
+    "phone": "+254700000011",
+    "location": [
+      -1.2554,
+      36.7857
+    ],
+    "capacityPerSlot": 96,
+    "slotDurationMinutes": 105,
+    "averageRating": 4.5,
+    "reviewCount": 88,
+    "menu": [
+      {
+        "name": "Mezze for two",
+        "description": "Hummus, moutabal, tabbouleh, falafel, bread",
+        "priceCents": 180000,
+        "category": "Mezze",
+        "nutrition": {
+          "caloriesKcal": 880,
+          "proteinG": 30,
+          "carbsG": 88,
+          "fatG": 44
+        }
+      },
+      {
+        "name": "Lamb shish",
+        "description": "Charcoal grilled, sumac onion",
+        "priceCents": 210000,
+        "category": "Grill"
+      },
+      {
+        "name": "Knafeh",
+        "description": "Cheese, kataifi, pistachio",
+        "priceCents": 70000,
+        "category": "Desserts"
+      }
+    ],
+    "floorPlan": [
+      {
+        "name": "Main floor",
+        "prefix": "M",
+        "rows": 3,
+        "columns": 4,
+        "seats": 4
+      },
+      {
+        "name": "Terrace",
+        "prefix": "T",
+        "rows": 2,
+        "columns": 4,
+        "seats": 6
+      }
+    ]
+  },
+  {
+    "id": "green-room",
+    "name": "The Green Room",
+    "description": "All day brunch and a kitchen garden out the back. Vegetarian by default, not by apology.",
+    "cuisine": "Vegetarian",
+    "priceBand": 2,
+    "address": "Rosslyn Riviera, Limuru Road, Nairobi",
+    "phone": "+254700000012",
+    "location": [
+      -1.2196,
+      36.8129
+    ],
+    "capacityPerSlot": 30,
+    "slotDurationMinutes": 75,
+    "averageRating": 4.3,
+    "reviewCount": 42,
+    "openingHours": {
+      "monday": "07:30-17:00",
+      "tuesday": "07:30-17:00",
+      "wednesday": "07:30-17:00",
+      "thursday": "07:30-17:00",
+      "friday": "07:30-17:00",
+      "saturday": "08:00-18:00",
+      "sunday": "08:00-16:00"
+    },
+    "menu": [
+      {
+        "name": "Garden bowl",
+        "description": "Whatever was picked this morning, tahini",
+        "priceCents": 95000,
+        "category": "Bowls",
+        "nutrition": {
+          "caloriesKcal": 480,
+          "proteinG": 18,
+          "carbsG": 54,
+          "fatG": 21
+        }
+      },
+      {
+        "name": "Shakshuka",
+        "description": "Two eggs, peppers, sourdough",
+        "priceCents": 85000,
+        "category": "Brunch",
+        "nutrition": {
+          "caloriesKcal": 520,
+          "proteinG": 24,
+          "carbsG": 42,
+          "fatG": 28
+        }
+      },
+      {
+        "name": "Banana bread",
+        "description": "Toasted, cultured butter",
+        "priceCents": 45000,
+        "category": "Bakery"
       }
     ]
   }
