@@ -4,20 +4,15 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.PhotoCamera
-import androidx.compose.material.icons.outlined.Restaurant
-import androidx.compose.material.icons.outlined.SearchOff
 import androidx.compose.material.icons.rounded.Info
+import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExtendedFloatingActionButton
@@ -40,20 +35,11 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
 import com.example.kulapro.R
 import com.example.kulapro.Routes
-import com.example.kulapro.feature.home.ActiveFilterSummary
-import com.example.kulapro.feature.home.HomeCuisineRow
-import com.example.kulapro.feature.home.HomeFilterActions
-import com.example.kulapro.feature.home.HomeFilterRow
-import com.example.kulapro.feature.home.HomeSearchField
-import com.example.kulapro.feature.home.HomeUiState
 import com.example.kulapro.feature.home.HomeViewModel
+import com.example.kulapro.feature.home.RestaurantResultList
 import com.example.kulapro.feature.owner.Portal
 import com.example.kulapro.feature.owner.PortalSwitcher
-import com.example.kulapro.ui.components.AnimatedListItem
-import com.example.kulapro.ui.components.EmptyState
 import com.example.kulapro.ui.components.MessageBanner
-import com.example.kulapro.ui.components.RestaurantCard
-import com.example.kulapro.ui.components.RestaurantCardSkeleton
 import com.example.kulapro.ui.components.UiMessage
 import com.example.kulapro.ui.components.rememberListEntryAnimator
 
@@ -63,6 +49,7 @@ fun HomePage(
     navController: NavController,
     onOpenRestaurant: (restaurantId: String) -> Unit,
     onSwitchToHosting: (String) -> Unit,
+    onSearch: () -> Unit,
     modifier: Modifier = Modifier,
     managedRestaurantId: String? = null,
     isReviewer: Boolean = false,
@@ -120,6 +107,9 @@ fun HomePage(
                             modifier = Modifier.padding(end = 4.dp),
                         )
                     }
+                    IconButton(onClick = onSearch) {
+                        Icon(Icons.Rounded.Search, contentDescription = "Search restaurants")
+                    }
                     IconButton(onClick = { navController.navigate(Routes.SETTINGS) }) {
                         Icon(Icons.Rounded.Settings, contentDescription = "Settings")
                     }
@@ -137,32 +127,12 @@ fun HomePage(
         ) {
             Greeting(name = state.greetingName)
 
-            val actions = HomeFilterActions(
-                onQueryChange = viewModel::setQuery,
-                onToggleCuisine = viewModel::toggleCuisine,
-                onTogglePriceBand = viewModel::togglePriceBand,
-                onToggleOpenNow = viewModel::toggleOpenNow,
-                onToggleFreeTonight = viewModel::toggleFreeTonight,
-                onToggleFavourites = viewModel::toggleFavouritesOnly,
-                onClearFilters = viewModel::clearFilters,
-            )
-
-            Column(
-                modifier = Modifier.padding(horizontal = 16.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                HomeSearchField(query = state.query, onQueryChange = actions.onQueryChange)
-                HomeFilterRow(state = state, actions = actions)
-                HomeCuisineRow(state = state, onToggleCuisine = actions.onToggleCuisine)
-                ActiveFilterSummary(state = state, onClearFilters = actions.onClearFilters)
-            }
-
-            RestaurantList(
+            RestaurantResultList(
                 state = state,
                 entryAnimator = entryAnimator,
                 onOpenRestaurant = onOpenRestaurant,
-                onToggleFavourite = { viewModel.toggleFavourite(it) },
-                onClearFilters = actions.onClearFilters,
+                onToggleFavourite = viewModel::toggleFavourite,
+                onClearFilters = viewModel::clearFilters,
             )
         }
     }
@@ -209,70 +179,3 @@ private fun Greeting(name: String, modifier: Modifier = Modifier) {
         }
     }
 }
-
-@Composable
-private fun RestaurantList(
-    state: HomeUiState,
-    entryAnimator: com.example.kulapro.ui.components.ListEntryAnimator,
-    onOpenRestaurant: (String) -> Unit,
-    onToggleFavourite: (com.example.kulapro.data.model.Restaurant) -> Unit,
-    onClearFilters: () -> Unit,
-) {
-    when {
-        // Skeletons matching the real card, so the layout does not jump on load.
-        state.isLoading -> LazyColumn(
-            contentPadding = PaddingValues(16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
-        ) {
-            items(PLACEHOLDER_COUNT) { RestaurantCardSkeleton() }
-        }
-
-        state.isEmpty -> EmptyState(
-            title = "No restaurants yet",
-            description = "Once restaurants join KulaPro they will show up here.",
-            icon = Icons.Outlined.Restaurant,
-        )
-
-        // A filtered-to-nothing list needs different words from an empty one. Telling
-        // someone there are no restaurants when they have just asked for cheap Ethiopian
-        // food at midnight is answering a question they did not ask.
-        state.isFilteredToNothing -> EmptyState(
-            title = "Nothing matches that",
-            description = if (state.favouritesOnly && state.favouriteIds.isEmpty()) {
-                "You have not kept any restaurants yet. Tap the heart on one to start."
-            } else {
-                "Try a wider search, or clear the filters to see everywhere again."
-            },
-            icon = Icons.Outlined.SearchOff,
-            actionLabel = "Clear filters",
-            onAction = onClearFilters,
-        )
-
-        else -> LazyColumn(
-            modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
-        ) {
-            // Keyed so a row scrolled out and back is the same row, not a new one rebuilt
-            // from scratch.
-            itemsIndexed(
-                items = state.visible,
-                key = { _, restaurant -> restaurant.id },
-            ) { index, restaurant ->
-                AnimatedListItem(index = index, key = restaurant.id, animator = entryAnimator) {
-                    RestaurantCard(
-                        restaurant = restaurant,
-                        onClick = { onOpenRestaurant(restaurant.id) },
-                        // Withheld from a guest, who has nowhere to keep a restaurant yet.
-                        isFavourite = state.isFavourite(restaurant.id)
-                            .takeIf { state.isSignedIn },
-                        onToggleFavourite = { onToggleFavourite(restaurant) }
-                            .takeIf { state.isSignedIn },
-                    )
-                }
-            }
-        }
-    }
-}
-
-private const val PLACEHOLDER_COUNT = 3

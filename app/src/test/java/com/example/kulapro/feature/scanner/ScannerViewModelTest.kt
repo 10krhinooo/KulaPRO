@@ -2,7 +2,11 @@ package com.example.kulapro.feature.scanner
 
 import com.example.kulapro.data.repository.Result
 import com.example.kulapro.data.scanner.DishNutrition
+import com.example.kulapro.data.model.MenuItem
+import com.example.kulapro.data.model.NutritionInfo
 import com.example.kulapro.data.scanner.ScannerRepository
+import com.example.kulapro.feature.booking.FakeRestaurantRepository
+import androidx.lifecycle.SavedStateHandle
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.StandardTestDispatcher
@@ -47,15 +51,36 @@ class ScannerViewModelTest {
         proteinG = 40.0,
     )
 
+    private lateinit var restaurants: FakeRestaurantRepository
+
     @Before
-    fun setUp() = Dispatchers.setMain(dispatcher)
+    fun setUp() {
+        Dispatchers.setMain(dispatcher)
+        restaurants = FakeRestaurantRepository()
+    }
+
+    /** Defaults to no dish named, which is the camera FAB's route into the screen. */
+    private fun viewModel(
+        scanner: ScannerRepository,
+        restaurantId: String = "",
+        menuItemId: String = "",
+    ) = ScannerViewModel(
+        scannerRepository = scanner,
+        restaurantRepository = restaurants,
+        savedStateHandle = SavedStateHandle(
+            mapOf(
+                ScannerViewModel.ARG_RESTAURANT_ID to restaurantId,
+                ScannerViewModel.ARG_MENU_ITEM_ID to menuItemId,
+            ),
+        ),
+    )
 
     @After
     fun tearDown() = Dispatchers.resetMain()
 
     @Test
     fun `starts with nothing to show`() = runTest(dispatcher) {
-        val viewModel = ScannerViewModel(FakeScannerRepository())
+        val viewModel = viewModel(FakeScannerRepository())
 
         assertFalse(viewModel.state.value.isScanning)
         assertFalse(viewModel.state.value.hasResult)
@@ -65,14 +90,14 @@ class ScannerViewModelTest {
     @Test
     fun `a build with no scanner says so rather than offering a dead button`() =
         runTest(dispatcher) {
-            val viewModel = ScannerViewModel(FakeScannerRepository(isAvailable = false))
+            val viewModel = viewModel(FakeScannerRepository(isAvailable = false))
 
             assertFalse(viewModel.state.value.isAvailable)
         }
 
     @Test
     fun `a scan shows the estimate`() = runTest(dispatcher) {
-        val viewModel = ScannerViewModel(FakeScannerRepository(result = aDish))
+        val viewModel = viewModel(FakeScannerRepository(result = aDish))
 
         viewModel.scan("base64")
         advanceUntilIdle()
@@ -84,7 +109,7 @@ class ScannerViewModelTest {
     @Test
     fun `a new scan clears the previous dish before it starts`() = runTest(dispatcher) {
         val repository = FakeScannerRepository(result = aDish)
-        val viewModel = ScannerViewModel(repository)
+        val viewModel = viewModel(repository)
         viewModel.scan("first")
         advanceUntilIdle()
 
@@ -98,7 +123,7 @@ class ScannerViewModelTest {
 
     @Test
     fun `a failed scan says what happened and shows no numbers`() = runTest(dispatcher) {
-        val viewModel = ScannerViewModel(
+        val viewModel = viewModel(
             FakeScannerRepository(failure = "We could not reach the scanner."),
         )
 
@@ -114,7 +139,7 @@ class ScannerViewModelTest {
     fun `an unreadable photo is reported without going near the network`() =
         runTest(dispatcher) {
             val repository = FakeScannerRepository()
-            val viewModel = ScannerViewModel(repository)
+            val viewModel = viewModel(repository)
 
             viewModel.reportUnreadableImage()
             advanceUntilIdle()
@@ -129,8 +154,7 @@ class ScannerViewModelTest {
     @Test
     fun `a photo that is not food is a friendly answer, not an error`() =
         runTest(dispatcher) {
-            val viewModel = ScannerViewModel(
-                FakeScannerRepository(result = DishNutrition(isFood = false)),
+            val viewModel = viewModel(FakeScannerRepository(result = DishNutrition(isFood = false)),
             )
 
             viewModel.scan("base64")
@@ -142,7 +166,7 @@ class ScannerViewModelTest {
 
     @Test
     fun `adjusting the portion scales what is shown`() = runTest(dispatcher) {
-        val viewModel = ScannerViewModel(FakeScannerRepository(result = aDish))
+        val viewModel = viewModel(FakeScannerRepository(result = aDish))
         viewModel.scan("base64")
         advanceUntilIdle()
 
@@ -154,7 +178,7 @@ class ScannerViewModelTest {
     @Test
     fun `two adjustments do not compound, because the original is kept`() =
         runTest(dispatcher) {
-            val viewModel = ScannerViewModel(FakeScannerRepository(result = aDish))
+            val viewModel = viewModel(FakeScannerRepository(result = aDish))
             viewModel.scan("base64")
             advanceUntilIdle()
 
@@ -166,7 +190,7 @@ class ScannerViewModelTest {
 
     @Test
     fun `a new scan starts back at the whole serving`() = runTest(dispatcher) {
-        val viewModel = ScannerViewModel(FakeScannerRepository(result = aDish))
+        val viewModel = viewModel(FakeScannerRepository(result = aDish))
         viewModel.scan("base64")
         advanceUntilIdle()
         viewModel.setPortion(HALF)
@@ -180,7 +204,7 @@ class ScannerViewModelTest {
     @Test
     fun `the serving the estimate assumed survives a portion adjustment`() =
         runTest(dispatcher) {
-            val viewModel = ScannerViewModel(FakeScannerRepository(result = aDish))
+            val viewModel = viewModel(FakeScannerRepository(result = aDish))
             viewModel.scan("base64")
             advanceUntilIdle()
 
@@ -191,7 +215,7 @@ class ScannerViewModelTest {
 
     @Test
     fun `an error can be dismissed`() = runTest(dispatcher) {
-        val viewModel = ScannerViewModel(FakeScannerRepository(failure = "No."))
+        val viewModel = viewModel(FakeScannerRepository(failure = "No."))
         viewModel.scan("base64")
         advanceUntilIdle()
 
@@ -202,7 +226,7 @@ class ScannerViewModelTest {
 
     @Test
     fun `clearing puts the screen back to where it started`() = runTest(dispatcher) {
-        val viewModel = ScannerViewModel(FakeScannerRepository(result = aDish))
+        val viewModel = viewModel(FakeScannerRepository(result = aDish))
         viewModel.scan("base64")
         advanceUntilIdle()
 
@@ -224,5 +248,95 @@ class ScannerViewModelTest {
                 "One and a half times",
                 state.copy(portionFactor = ONE_AND_A_HALF).portionLabel,
             )
+        }
+
+    @Test
+    fun `a dish the restaurant has described answers without a model call`() =
+        runTest(dispatcher) {
+            val repository = FakeScannerRepository()
+            restaurants.menuItems = listOf(
+                MenuItem(
+                    id = "m1",
+                    name = "Ugali na nyama",
+                    nutrition = NutritionInfo(caloriesKcal = 780.0, proteinG = 42.0),
+                ),
+            )
+
+            val viewModel = viewModel(repository, restaurantId = "r1", menuItemId = "m1")
+            advanceUntilIdle()
+
+            // The whole point of letting owners type nutrition into the admin menu.
+            assertTrue(repository.scannedImages.isEmpty())
+            assertEquals("Ugali na nyama", viewModel.state.value.result?.dishName)
+            assertEquals(780.0, viewModel.state.value.result?.caloriesKcal ?: 0.0, 0.001)
+            assertTrue(viewModel.state.value.answeredFromMenu)
+        }
+
+    @Test
+    fun `a dish with no nutrition on file asks for a photograph, naming the dish`() =
+        runTest(dispatcher) {
+            restaurants.menuItems = listOf(MenuItem(id = "m1", name = "Ugali na nyama"))
+
+            val viewModel = viewModel(
+                FakeScannerRepository(),
+                restaurantId = "r1",
+                menuItemId = "m1",
+            )
+            advanceUntilIdle()
+
+            assertEquals("Ugali na nyama", viewModel.state.value.dishFromMenu)
+            assertFalse(viewModel.state.value.hasResult)
+            assertTrue(viewModel.state.value.needsPhotoForNamedDish)
+        }
+
+    @Test
+    fun `a menu that cannot be read falls back to the camera rather than failing`() =
+        runTest(dispatcher) {
+            restaurants.menuFailure = "You are offline."
+
+            val viewModel = viewModel(
+                FakeScannerRepository(),
+                restaurantId = "r1",
+                menuItemId = "m1",
+            )
+            advanceUntilIdle()
+
+            assertFalse(viewModel.state.value.hasResult)
+            assertNull(viewModel.state.value.errorMessage)
+        }
+
+    @Test
+    fun `scanning again from a menu item still knows which dish was asked about`() =
+        runTest(dispatcher) {
+            restaurants.menuItems = listOf(
+                MenuItem(
+                    id = "m1",
+                    name = "Ugali",
+                    nutrition = NutritionInfo(caloriesKcal = 1.0),
+                ),
+            )
+            val viewModel = viewModel(
+                FakeScannerRepository(),
+                restaurantId = "r1",
+                menuItemId = "m1",
+            )
+            advanceUntilIdle()
+
+            viewModel.clear()
+
+            assertEquals("Ugali", viewModel.state.value.dishFromMenu)
+            assertFalse(viewModel.state.value.hasResult)
+        }
+
+    @Test
+    fun `opening the scanner with no dish named reads no menu at all`() =
+        runTest(dispatcher) {
+            restaurants.menuItems = listOf(MenuItem(id = "m1", name = "Ugali"))
+
+            val viewModel = viewModel(FakeScannerRepository())
+            advanceUntilIdle()
+
+            assertEquals("", viewModel.state.value.dishFromMenu)
+            assertFalse(viewModel.state.value.hasResult)
         }
 }

@@ -1,5 +1,7 @@
 package com.example.kulapro.data.scanner
 
+import com.example.kulapro.data.model.MenuItem
+
 /**
  * What the scanner came back with.
  *
@@ -23,6 +25,13 @@ data class DishNutrition(
     val healthNotes: List<String> = emptyList(),
     /** True when the answer came from the shared cache, so it cost nothing. */
     val wasCached: Boolean = false,
+    /**
+     * True when the restaurant supplied these figures itself.
+     *
+     * Different from an estimate in kind, not just in confidence, and the screen has to say
+     * so: one is a guess from a photograph, the other is what the kitchen says it serves.
+     */
+    val isFromMenu: Boolean = false,
 ) {
     /**
      * Scales every macro for a different serving.
@@ -37,6 +46,34 @@ data class DishNutrition(
         fatG = fatG * factor,
         fibreG = fibreG * factor,
     )
+
+    companion object {
+        /**
+         * A dish the restaurant has already described, with no model call at all.
+         *
+         * This is the whole point of letting owners type nutrition into the admin menu: an
+         * item that carries its own numbers is answered from Firestore, instantly and for
+         * nothing, and it is the restaurant's own figure rather than a guess from a photo.
+         */
+        fun fromMenuItem(item: MenuItem): DishNutrition? {
+            val nutrition = item.nutrition ?: return null
+            return DishNutrition(
+                isFood = true,
+                dishName = item.name,
+                confidence = Confidence.HIGH,
+                assumedPortion = nutrition.assumedPortion.ifBlank {
+                    "one serving as the restaurant lists it"
+                },
+                caloriesKcal = nutrition.caloriesKcal,
+                proteinG = nutrition.proteinG,
+                carbsG = nutrition.carbsG,
+                fatG = nutrition.fatG,
+                fibreG = nutrition.fibreG,
+                likelyIngredients = nutrition.likelyIngredients,
+                isFromMenu = true,
+            )
+        }
+    }
 
     enum class Confidence(val label: String, val explanation: String) {
         HIGH(

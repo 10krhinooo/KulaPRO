@@ -15,6 +15,8 @@ data class ScannerUiState(
     val portionFactor: Double = 1.0,
     val errorMessage: String? = null,
     val isAvailable: Boolean = true,
+    /** Set when the scanner was opened from a particular dish on a menu. */
+    val dishFromMenu: String = "",
 ) {
     /** The numbers actually drawn, after the diner's own portion adjustment. */
     val shown: DishNutrition? get() = result?.scaledBy(portionFactor)
@@ -23,6 +25,13 @@ data class ScannerUiState(
 
     /** True when the photograph was not of food, which is a friendly answer, not an error. */
     val isNotFood: Boolean get() = result?.isFood == false
+
+    /** True when the restaurant's own figures answered, so nothing was sent anywhere. */
+    val answeredFromMenu: Boolean get() = result?.isFromMenu == true
+
+    /** A named dish with nothing on file still needs a photograph, and says whose it is. */
+    val needsPhotoForNamedDish: Boolean
+        get() = dishFromMenu.isNotBlank() && result == null && !isScanning
 
     /** Said out loud when the portion is not the one the estimate was calculated against. */
     val portionLabel: String

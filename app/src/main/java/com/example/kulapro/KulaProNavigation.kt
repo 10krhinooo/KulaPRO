@@ -41,6 +41,7 @@ import com.example.kulapro.data.repository.AuthRepositoryFirebase
 import com.example.kulapro.data.repository.Result
 import com.example.kulapro.feature.owner.OwnerPortal
 import com.example.kulapro.feature.ownership.OwnershipRequestScreen
+import com.example.kulapro.feature.home.SearchScreen
 import com.example.kulapro.feature.ownership.OwnershipReviewScreen
 import com.example.kulapro.feature.scanner.ScannerScreen
 import com.example.kulapro.pages.AboutScreen
@@ -213,13 +214,23 @@ fun KulaProNavigation(
                     // since a scan is counted against their daily quota and therefore has
                     // to belong to somebody.
                     onScanDish = if (canScan && signedInUserId != null) {
-                        { navController.navigate(Routes.SCANNER) }
+                        { navController.navigate(Routes.scanner()) }
                     } else {
                         null
                     },
                     onSwitchToHosting = { restaurantId ->
                         navController.navigate(Routes.owner(restaurantId))
                     },
+                    onOpenRestaurant = { restaurantId ->
+                        navController.navigate(Routes.restaurant(restaurantId))
+                    },
+                    onSearch = { navController.navigate(Routes.SEARCH) },
+                )
+            }
+
+            composable(Routes.SEARCH) {
+                SearchScreen(
+                    onBack = { navController.popBackStack() },
                     onOpenRestaurant = { restaurantId ->
                         navController.navigate(Routes.restaurant(restaurantId))
                     },
@@ -230,8 +241,18 @@ fun KulaProNavigation(
                 route = Routes.RESTAURANT,
                 arguments = listOf(navArgument("restaurantId") { type = NavType.StringType }),
             ) { entry ->
+                val detailRestaurantId = entry.arguments?.getString("restaurantId").orEmpty()
                 RestaurantDetailScreen(
-                    restaurantId = entry.arguments?.getString("restaurantId").orEmpty(),
+                    restaurantId = detailRestaurantId,
+                    onScanDish = if (canScan && signedInUserId != null) {
+                        { menuItemId ->
+                            navController.navigate(
+                                Routes.scanner(detailRestaurantId, menuItemId),
+                            )
+                        }
+                    } else {
+                        null
+                    },
                     onBack = { navController.popBackStack() },
                     onBook = { restaurantId, restaurantName ->
                         requireSignIn(
@@ -276,7 +297,19 @@ fun KulaProNavigation(
                 OwnershipRequestScreen(onBack = { navController.popBackStack() })
             }
 
-            composable(Routes.SCANNER) {
+            composable(
+                route = Routes.SCANNER,
+                arguments = listOf(
+                    navArgument("restaurantId") {
+                        type = NavType.StringType
+                        defaultValue = ""
+                    },
+                    navArgument("menuItemId") {
+                        type = NavType.StringType
+                        defaultValue = ""
+                    },
+                ),
+            ) {
                 ScannerScreen(onBack = { navController.popBackStack() })
             }
 

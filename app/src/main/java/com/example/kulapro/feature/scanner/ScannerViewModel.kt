@@ -1,8 +1,11 @@
 package com.example.kulapro.feature.scanner
 
+import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.kulapro.data.repository.Result
+import com.example.kulapro.data.repository.RestaurantRepository
+import com.example.kulapro.data.scanner.DishNutrition
 import com.example.kulapro.data.scanner.ScannerRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
@@ -22,12 +25,38 @@ import kotlinx.coroutines.launch
 @HiltViewModel
 class ScannerViewModel @Inject constructor(
     private val scannerRepository: ScannerRepository,
+    private val restaurantRepository: RestaurantRepository,
+    savedStateHandle: SavedStateHandle,
 ) : ViewModel() {
+
+    private val restaurantId: String = savedStateHandle.get<String>(ARG_RESTAURANT_ID).orEmpty()
+    private val menuItemId: String = savedStateHandle.get<String>(ARG_MENU_ITEM_ID).orEmpty()
 
     private val _state = MutableStateFlow(
         ScannerUiState(isAvailable = scannerRepository.isAvailable),
     )
     val state: StateFlow<ScannerUiState> = _state.asStateFlow()
+
+    init {
+        if (menuItemId.isNotBlank()) loadMenuItem()
+    }
+
+    /**
+     * Answers from the restaurant's own figures when it can.
+     *
+     * A dish whose menu entry already carries nutrition never reaches the model: no photo,
+     * no network, no cost, and a better answer than a photograph could give. This is what
+     * makes an owner filling in the admin menu worth their time.
+     */
+    private fun loadMenuItem() = viewModelScope.launch {
+        val menu = restaurantRepository.menu(restaurantId)
+        if (menu !is Result.Success) return@launch
+
+        val item = menu.data.firstOrNull { it.id == menuItemId } ?: return@launch
+        _state.update {
+            it.copy(dishFromMenu = item.name, result = DishNutrition.fromMenuItem(item))
+        }
+    }
 
     fun scan(imageBase64: String) {
         _state.update {
@@ -59,6 +88,16 @@ class ScannerViewModel @Inject constructor(
     fun dismissError() = _state.update { it.copy(errorMessage = null) }
 
     fun clear() = _state.update {
-        ScannerUiState(isAvailable = scannerRepository.isAvailable)
+        // The dish this was opened for survives, so "scan another" from a menu item still
+        // knows which dish the diner was asking about.
+        ScannerUiState(
+            isAvailable = scannerRepository.isAvailable,
+            dishFromMenu = it.dishFromMenu,
+        )
+    }
+
+    companion object {
+        const val ARG_RESTAURANT_ID = "restaurantId"
+        const val ARG_MENU_ITEM_ID = "menuItemId"
     }
 }

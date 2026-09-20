@@ -34,6 +34,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -94,6 +95,8 @@ fun RestaurantDetailScreen(
     onClaim: (restaurantId: String, restaurantName: String) -> Unit,
     modifier: Modifier = Modifier,
     isSignedIn: Boolean = false,
+    /** Null when no scanner is configured, or when nobody is signed in to charge it to. */
+    onScanDish: ((menuItemId: String) -> Unit)? = null,
     restaurantRepository: RestaurantRepository = remember { RestaurantRepositoryFirestore() },
     reviewRepository: ReviewRepository = remember { ReviewRepositoryFirestore() },
 ) {
@@ -220,7 +223,11 @@ fun RestaurantDetailScreen(
 
             itemsIndexed(menu, key = { _, item -> item.id }) { index, item ->
                 AnimatedListItem(index = index, key = item.id, animator = entryAnimator) {
-                    MenuRow(item = item, modifier = Modifier.padding(horizontal = 16.dp))
+                    MenuRow(
+                        item = item,
+                        onScan = onScanDish?.let { scan -> { scan(item.id) } },
+                        modifier = Modifier.padding(horizontal = 16.dp),
+                    )
                 }
             }
 
@@ -498,7 +505,11 @@ private fun Fact(
 }
 
 @Composable
-private fun MenuRow(item: MenuItem, modifier: Modifier = Modifier) {
+private fun MenuRow(
+    item: MenuItem,
+    onScan: (() -> Unit)?,
+    modifier: Modifier = Modifier,
+) {
     Card(
         modifier = modifier.fillMaxWidth().padding(vertical = 4.dp),
         shape = MaterialTheme.shapes.medium,
@@ -528,6 +539,22 @@ private fun MenuRow(item: MenuItem, modifier: Modifier = Modifier) {
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.secondary,
                     )
+                }
+                onScan?.let {
+                    // Two different offers behind one control. A dish the restaurant has
+                    // already described answers instantly and for nothing; one it has not
+                    // asks for a photograph. Saying which is which up front stops the
+                    // second feeling like a failure of the first.
+                    TextButton(onClick = it, contentPadding = PaddingValues(0.dp)) {
+                        Text(
+                            text = if (item.nutrition == null) {
+                                "Scan this dish"
+                            } else {
+                                "See nutrition"
+                            },
+                            style = MaterialTheme.typography.labelMedium,
+                        )
+                    }
                 }
             }
             Text(

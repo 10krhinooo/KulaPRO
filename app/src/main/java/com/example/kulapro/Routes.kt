@@ -17,7 +17,8 @@ object Routes {
     const val CLAIM_RESTAURANT = "claim/{restaurantId}/{restaurantName}"
     const val LIST_RESTAURANT = "listRestaurant"
     const val OWNERSHIP_REVIEW = "ownershipReview"
-    const val SCANNER = "scanner"
+    const val SEARCH = "search"
+    const val SCANNER = "scanner?restaurantId={restaurantId}&menuItemId={menuItemId}"
 
     fun claimRestaurant(restaurantId: String, restaurantName: String): String =
         "claim/$restaurantId/${encode(restaurantName)}"
@@ -32,6 +33,19 @@ object Routes {
      */
     fun owner(restaurantId: String): String =
         if (restaurantId.isBlank()) "owner" else "owner?restaurantId=$restaurantId"
+
+    /**
+     * The scanner, optionally asking about a particular dish on a menu.
+     *
+     * With a dish named, a menu entry that already carries nutrition answers immediately
+     * and nothing is sent anywhere. Without one, it is the camera.
+     */
+    fun scanner(restaurantId: String = "", menuItemId: String = ""): String =
+        if (restaurantId.isBlank() || menuItemId.isBlank()) {
+            "scanner"
+        } else {
+            "scanner?restaurantId=$restaurantId&menuItemId=$menuItemId"
+        }
 
     const val RESERVATION_FORM = "reservationForm/{restaurantId}/{restaurantName}"
 

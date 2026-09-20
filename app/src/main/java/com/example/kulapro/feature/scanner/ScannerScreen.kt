@@ -144,6 +144,18 @@ fun ScannerScreen(
                     },
                 )
 
+                // A dish was named but the restaurant has not filled in its nutrition, so
+                // this is the fallback rather than the front door. Naming the dish makes
+                // that read as "we do not have this one" rather than as a dead end.
+                state.needsPhotoForNamedDish -> EmptyState(
+                    title = state.dishFromMenu,
+                    description = "This restaurant has not listed the nutrition for this " +
+                        "dish. Take a photo and we will estimate it.",
+                    icon = Icons.Outlined.PhotoCamera,
+                    actionLabel = "Take a photo",
+                    onAction = { pick() },
+                )
+
                 else -> EmptyState(
                     title = "What are you eating?",
                     description = "Take a photo of the dish and we will estimate what is " +
@@ -241,10 +253,10 @@ private fun ResultSheet(
             }
         }
 
-        Disclaimer()
+        Disclaimer(fromMenu = shown.isFromMenu)
 
         PrimaryButton(
-            text = "Scan another dish",
+            text = if (state.answeredFromMenu) "Photograph it anyway" else "Scan another dish",
             onClick = onScanAgain,
             modifier = Modifier.fillMaxWidth(),
         )
@@ -269,12 +281,23 @@ private fun EstimateBasis(result: DishNutrition, modifier: Modifier = Modifier) 
             verticalArrangement = Arrangement.spacedBy(4.dp),
         ) {
             Text(
-                text = "Estimate, ${result.confidence.label.lowercase()}",
+                text = if (result.isFromMenu) {
+                    "From the restaurant"
+                } else {
+                    "Estimate, ${result.confidence.label.lowercase()}"
+                },
                 style = MaterialTheme.typography.titleSmall,
                 color = MaterialTheme.colorScheme.onSecondaryContainer,
             )
             Text(
-                text = result.confidence.explanation,
+                // Figures the kitchen published are a different kind of thing from a guess
+                // at a photograph, and saying so is the difference between the two being
+                // trusted correctly.
+                text = if (result.isFromMenu) {
+                    "These are the restaurant's own figures, not an estimate from a photo."
+                } else {
+                    result.confidence.explanation
+                },
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSecondaryContainer,
             )
@@ -360,15 +383,20 @@ private fun Macro(label: String, grams: Double, modifier: Modifier = Modifier) {
  * badly hurt, so the app says where the answer actually lives.
  */
 @Composable
-private fun Disclaimer(modifier: Modifier = Modifier) {
+private fun Disclaimer(fromMenu: Boolean, modifier: Modifier = Modifier) {
     Surface(
         modifier = modifier.fillMaxWidth(),
         shape = MaterialTheme.shapes.medium,
         color = MaterialTheme.colorScheme.surfaceVariant,
     ) {
         Text(
-            text = "These are estimates from a photograph, not measurements, and they are " +
-                "not dietary advice. For allergens, ask the restaurant.",
+            text = if (fromMenu) {
+                "Published by the restaurant, and not dietary advice. For allergens, ask " +
+                    "them directly."
+            } else {
+                "These are estimates from a photograph, not measurements, and they are " +
+                    "not dietary advice. For allergens, ask the restaurant."
+            },
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(12.dp),
