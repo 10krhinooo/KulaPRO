@@ -64,7 +64,7 @@ import kotlinx.coroutines.launch
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun OwnershipReviewScreen(
-    onBack: () -> Unit,
+    onBack: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
     repository: OwnershipRepository = remember { OwnershipRepositoryFirestore() },
 ) {
@@ -117,11 +117,15 @@ fun OwnershipReviewScreen(
                     }
                 },
                 navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Rounded.ArrowBack,
-                            contentDescription = "Back",
-                        )
+                    // Absent when this is a tab of the admin portal rather than a push from
+                    // the profile screen, where there is somewhere to go back to.
+                    if (onBack != null) {
+                        IconButton(onClick = onBack) {
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Rounded.ArrowBack,
+                                contentDescription = "Back",
+                            )
+                        }
                     }
                 },
             )

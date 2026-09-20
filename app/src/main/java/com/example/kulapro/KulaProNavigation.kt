@@ -204,6 +204,7 @@ fun KulaProNavigation(
                     navController = navController,
                     isSignedIn = signedInUserId != null,
                     managedRestaurantId = managedRestaurants.firstOrNull(),
+                    isReviewer = isReviewer,
                     onSwitchToHosting = { restaurantId ->
                         navController.navigate(Routes.owner(restaurantId))
                     },
@@ -292,10 +293,14 @@ fun KulaProNavigation(
 
             composable(
                 route = Routes.OWNER,
-                arguments = listOf(navArgument("restaurantId") { type = NavType.StringType }),
-            ) { entry ->
+                arguments = listOf(
+                    navArgument("restaurantId") {
+                        type = NavType.StringType
+                        defaultValue = ""
+                    },
+                ),
+            ) {
                 OwnerPortal(
-                    restaurantId = entry.arguments?.getString("restaurantId").orEmpty(),
                     onSwitchToCustomer = {
                         navController.navigate(Routes.HOME) {
                             popUpTo(Routes.HOME) { inclusive = true }

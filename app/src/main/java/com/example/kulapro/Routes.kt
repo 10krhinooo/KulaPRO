@@ -12,7 +12,7 @@ object Routes {
     const val PROFILE = "profile"
     const val SETTINGS = "settings"
     const val ABOUT = "about"
-    const val OWNER = "owner/{restaurantId}"
+    const val OWNER = "owner?restaurantId={restaurantId}"
     const val RESTAURANT = "restaurant/{restaurantId}"
     const val CLAIM_RESTAURANT = "claim/{restaurantId}/{restaurantName}"
     const val LIST_RESTAURANT = "listRestaurant"
@@ -23,7 +23,14 @@ object Routes {
 
     fun restaurant(restaurantId: String): String = "restaurant/$restaurantId"
 
-    fun owner(restaurantId: String): String = "owner/$restaurantId"
+    /**
+     * The admin side, optionally for a particular restaurant.
+     *
+     * The id is optional because a platform reviewer who hosts nothing still has an admin
+     * side: the ownership requests waiting on them.
+     */
+    fun owner(restaurantId: String): String =
+        if (restaurantId.isBlank()) "owner" else "owner?restaurantId=$restaurantId"
 
     const val RESERVATION_FORM = "reservationForm/{restaurantId}/{restaurantName}"
 

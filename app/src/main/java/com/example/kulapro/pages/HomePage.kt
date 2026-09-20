@@ -17,7 +17,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Restaurant
 import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.Settings
-import androidx.compose.material3.CenterAlignedTopAppBar
+import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -63,6 +63,7 @@ fun HomePage(
     modifier: Modifier = Modifier,
     isSignedIn: Boolean = false,
     managedRestaurantId: String? = null,
+    isReviewer: Boolean = false,
     repository: RestaurantRepository = remember { RestaurantRepositoryFirestore() },
     appContext: android.content.Context = LocalContext.current.applicationContext,
     profileRepository: ProfileRepository = remember { AuthRepositoryFirebase(appContext) },
@@ -94,7 +95,10 @@ fun HomePage(
         // double count the navigation bar height.
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
         topBar = {
-            CenterAlignedTopAppBar(
+            // Left aligned rather than centred: with a portal switcher and two icons in the
+            // actions slot, a centred title is squeezed into a column narrow enough to wrap
+            // the wordmark onto two lines.
+            TopAppBar(
                 title = {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
@@ -113,20 +117,26 @@ fun HomePage(
                                 )
                             }
                         }
-                        Text("KulaPro", style = MaterialTheme.typography.titleLarge)
+                        Text(
+                            text = "KulaPro",
+                            style = MaterialTheme.typography.titleLarge,
+                            maxLines = 1,
+                        )
                     }
                 },
-                colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
+                colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = MaterialTheme.colorScheme.surface,
                     titleContentColor = MaterialTheme.colorScheme.primary,
                 ),
                 actions = {
-                    // Only rendered when the user's claims name a restaurant, so the control
-                    // never promises access the rules would refuse.
-                    managedRestaurantId?.let { id ->
+                    // Only rendered when the user's claims name a restaurant to manage or a
+                    // platform role to exercise, so the control never promises access the
+                    // rules would refuse. A reviewer who hosts nothing still has an admin
+                    // side: the requests waiting on them.
+                    if (managedRestaurantId != null || isReviewer) {
                         PortalSwitcher(
                             current = Portal.CUSTOMER,
-                            onSwitch = { onSwitchToHosting(id) },
+                            onSwitch = { onSwitchToHosting(managedRestaurantId.orEmpty()) },
                             modifier = Modifier.padding(end = 4.dp),
                         )
                     }

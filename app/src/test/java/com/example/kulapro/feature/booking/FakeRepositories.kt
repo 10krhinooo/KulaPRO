@@ -22,8 +22,10 @@ import kotlinx.coroutines.flow.flowOf
 class FakeRestaurantRepository(
     var restaurant: Restaurant = Restaurant(id = "r1", name = "The Bistro"),
     var tables: List<RestaurantTable> = emptyList(),
+    var menuItems: List<MenuItem> = emptyList(),
     var restaurantFailure: String? = null,
     var tablesFailure: String? = null,
+    var menuFailure: String? = null,
 ) : RestaurantRepository {
 
     override fun restaurants(): Flow<List<Restaurant>> = flowOf(listOf(restaurant))
@@ -32,7 +34,7 @@ class FakeRestaurantRepository(
         restaurantFailure?.let { Result.Failure(it) } ?: Result.Success(restaurant)
 
     override suspend fun menu(restaurantId: String): Result<List<MenuItem>> =
-        Result.Success(emptyList())
+        menuFailure?.let { Result.Failure(it) } ?: Result.Success(menuItems)
 
     override suspend fun tables(restaurantId: String): Result<List<RestaurantTable>> =
         tablesFailure?.let { Result.Failure(it) } ?: Result.Success(tables)

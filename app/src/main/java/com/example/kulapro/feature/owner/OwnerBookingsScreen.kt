@@ -65,7 +65,7 @@ import java.util.Locale
  */
 @Composable
 fun OwnerBookingsScreen(
-    onBack: () -> Unit,
+    onBack: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
     viewModel: OwnerBookingsViewModel = hiltViewModel(),
 ) {
@@ -98,7 +98,7 @@ data class OwnerBookingActions(
 @Composable
 private fun OwnerBookingsContent(
     state: OwnerBookingsUiState,
-    onBack: () -> Unit,
+    onBack: (() -> Unit)?,
     actions: OwnerBookingActions,
     modifier: Modifier = Modifier,
 ) {
@@ -136,11 +136,15 @@ private fun OwnerBookingsContent(
                     }
                 },
                 navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Rounded.ArrowBack,
-                            contentDescription = "Back",
-                        )
+                    // Absent when the screen is a tab of the portal rather than a push: a
+                    // back arrow that goes nowhere is worse than no arrow.
+                    if (onBack != null) {
+                        IconButton(onClick = onBack) {
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Rounded.ArrowBack,
+                                contentDescription = "Back",
+                            )
+                        }
                     }
                 },
             )

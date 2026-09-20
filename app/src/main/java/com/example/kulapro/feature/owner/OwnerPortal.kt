@@ -6,121 +6,71 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.outlined.TravelExplore
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.NavigationBar
+import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import com.example.kulapro.data.model.Reservation
+import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.kulapro.data.model.Restaurant
-import com.example.kulapro.data.repository.OwnerRepository
-import com.example.kulapro.data.repository.OwnerRepositoryFirestore
-import com.example.kulapro.data.repository.RestaurantRepository
-import com.example.kulapro.data.repository.RestaurantRepositoryFirestore
-import com.example.kulapro.data.repository.Result
+import com.example.kulapro.feature.ownership.OwnershipReviewScreen
 import com.example.kulapro.ui.components.ErrorState
-import com.example.kulapro.ui.components.MessageHost
-import com.example.kulapro.ui.components.rememberMessageHostState
-import com.google.firebase.Timestamp
-import java.util.Calendar
-import java.util.Date
-import kotlinx.coroutines.launch
-
-private enum class OwnerScreen { DASHBOARD, BOOKINGS, EDIT }
+import com.example.kulapro.ui.components.MessageBanner
 
 /**
  * The restaurant side of the app.
  *
- * Reached through the portal switcher, and only offered to users whose Auth claims name a
- * restaurant, so a diner never sees a door they cannot open.
+ * A bar across the bottom rather than buttons on a dashboard, because these are the places
+ * someone running a service moves between all evening, not a menu they visit once. Sections
+ * bring their own chrome, so this owns only the bar and what sits behind it.
  */
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun OwnerPortal(
-    restaurantId: String,
     onSwitchToCustomer: () -> Unit,
     modifier: Modifier = Modifier,
-    restaurantRepository: RestaurantRepository = remember { RestaurantRepositoryFirestore() },
-    ownerRepository: OwnerRepository = remember { OwnerRepositoryFirestore() },
+    viewModel: OwnerPortalViewModel = hiltViewModel(),
 ) {
-    val scope = rememberCoroutineScope()
-    val messages = rememberMessageHostState()
-
-    var screen by remember { mutableStateOf(OwnerScreen.DASHBOARD) }
-    var restaurant by remember { mutableStateOf<Restaurant?>(null) }
-    var bookings by remember { mutableStateOf<List<Reservation>>(emptyList()) }
-    var loadError by remember { mutableStateOf<String?>(null) }
-    var isSaving by remember { mutableStateOf(false) }
-    var reloadToken by remember { mutableStateOf(0) }
-
-    LaunchedEffect(restaurantId, reloadToken) {
-        loadError = null
-        when (val result = restaurantRepository.restaurant(restaurantId)) {
-            is Result.Success -> restaurant = result.data
-            is Result.Failure -> loadError = result.message
-        }
-        val dayStart = startOfToday()
-        val dayEnd = Date(dayStart.time + DAY_MILLIS)
-        when (
-            val result = ownerRepository.bookingsFor(
-                restaurantId = restaurantId,
-                from = Timestamp(dayStart),
-                to = Timestamp(dayEnd),
-            )
-        ) {
-            is Result.Success -> bookings = result.data
-            is Result.Failure -> loadError = loadError ?: result.message
-        }
-    }
-
-    // Bookings brings its own chrome, so it replaces this screen rather than nesting inside
-    // it and producing two stacked app bars.
-    if (screen == OwnerScreen.BOOKINGS) {
-        OwnerBookingsScreen(
-            onBack = { screen = OwnerScreen.DASHBOARD },
-            modifier = modifier,
-        )
-        return
-    }
+    val state by viewModel.state.collectAsStateWithLifecycle()
 
     Scaffold(
         modifier = modifier,
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
-        topBar = {
-            TopAppBar(
-                title = { Text(if (screen == OwnerScreen.EDIT) "Edit listing" else "Hosting") },
-                navigationIcon = {
-                    if (screen == OwnerScreen.EDIT) {
-                        IconButton(onClick = { screen = OwnerScreen.DASHBOARD }) {
-                            Icon(
-                                Icons.AutoMirrored.Filled.ArrowBack,
-                                contentDescription = "Back",
-                            )
-                        }
-                    }
-                },
-                actions = {
-                    PortalSwitcher(
-                        current = Portal.OWNER,
-                        onSwitch = { onSwitchToCustomer() },
-                        modifier = Modifier.padding(end = 8.dp),
-                    )
-                },
-            )
+        snackbarHost = {
+            MessageBanner(message = state.message, onDismiss = viewModel::dismissMessage)
         },
-        snackbarHost = { MessageHost(messages) },
+        bottomBar = {
+            NavigationBar {
+                state.sections.forEach { section ->
+                    NavigationBarItem(
+                        selected = section == state.section && !state.isEditingListing,
+                        onClick = { viewModel.selectSection(section) },
+                        icon = { Icon(section.icon, contentDescription = null) },
+                        label = { Text(section.label) },
+                    )
+                }
+                // The way out, always present. A reviewer who hosts no restaurant sees only
+                // one section, and without this the system back button was the only exit.
+                NavigationBarItem(
+                    selected = false,
+                    onClick = onSwitchToCustomer,
+                    icon = {
+                        Icon(Icons.Outlined.TravelExplore, contentDescription = null)
+                    },
+                    label = { Text("Booking") },
+                )
+            }
+        },
     ) { padding ->
         Box(
             modifier = Modifier
@@ -128,53 +78,122 @@ fun OwnerPortal(
                 .padding(padding),
             contentAlignment = Alignment.Center,
         ) {
-            val current = restaurant
-            when {
-                loadError != null && current == null -> ErrorState(
-                    message = loadError.orEmpty(),
-                    onRetry = { reloadToken++ },
-                )
-
-                current == null -> CircularProgressIndicator()
-
-                screen == OwnerScreen.DASHBOARD -> OwnerDashboard(
-                    restaurant = current,
-                    todaysBookings = bookings,
-                    onEditRestaurant = { screen = OwnerScreen.EDIT },
-                    onViewBookings = { screen = OwnerScreen.BOOKINGS },
-                )
-
-                else -> EditRestaurantScreen(
-                    restaurant = current,
-                    saving = isSaving,
-                    onSave = { updated ->
-                        isSaving = true
-                        scope.launch {
-                            val result = ownerRepository.updateRestaurant(updated)
-                            isSaving = false
-                            when (result) {
-                                is Result.Success -> {
-                                    restaurant = updated
-                                    screen = OwnerScreen.DASHBOARD
-                                    messages.showSuccess("Listing updated")
-                                }
-
-                                is Result.Failure ->
-                                    messages.showError(result.message)
-                            }
-                        }
-                    },
-                )
-            }
+            PortalSection(state = state, viewModel = viewModel)
         }
     }
 }
 
-private const val DAY_MILLIS = 24L * 60 * 60 * 1000
+@Composable
+private fun PortalSection(state: OwnerPortalUiState, viewModel: OwnerPortalViewModel) {
+    // Menu, setup and requests each read their own data and do not need the restaurant
+    // document this screen is still fetching, so they are not held up behind it.
+    when (state.section) {
+        AdminSection.MENU -> {
+            MenuManagementScreen()
+            return
+        }
 
-private fun startOfToday(): Date = Calendar.getInstance().apply {
-    set(Calendar.HOUR_OF_DAY, 0)
-    set(Calendar.MINUTE, 0)
-    set(Calendar.SECOND, 0)
-    set(Calendar.MILLISECOND, 0)
-}.time
+        AdminSection.SETUP -> {
+            CapacitySetupScreen()
+            return
+        }
+
+        AdminSection.REQUESTS -> {
+            OwnershipReviewScreen()
+            return
+        }
+
+        AdminSection.BOOKINGS -> {
+            OwnerBookingsScreen()
+            return
+        }
+
+        AdminSection.TODAY -> Unit
+    }
+
+    val restaurant = state.restaurant
+    if (!state.hostsARestaurant) {
+        // A reviewer who manages no restaurant has nothing to show here, and the bar will
+        // not have offered this section in the first place.
+        return
+    }
+    when {
+        state.loadError != null && restaurant == null ->
+            ErrorState(message = state.loadError, onRetry = viewModel::refresh)
+
+        restaurant == null -> CircularProgressIndicator()
+
+        state.isEditingListing -> ListingEditor(
+            state = state,
+            restaurant = restaurant,
+            onSave = viewModel::saveListing,
+            onBack = viewModel::stopEditingListing,
+        )
+
+        else -> TodayScaffold(
+            state = state,
+            restaurant = restaurant,
+            onEditRestaurant = viewModel::editListing,
+            onViewBookings = { viewModel.selectSection(AdminSection.BOOKINGS) },
+        )
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun TodayScaffold(
+    state: OwnerPortalUiState,
+    restaurant: Restaurant,
+    onEditRestaurant: () -> Unit,
+    onViewBookings: () -> Unit,
+) {
+    Scaffold(
+        contentWindowInsets = WindowInsets(0, 0, 0, 0),
+        topBar = {
+            TopAppBar(
+                title = { Text("Hosting") },
+            )
+        },
+    ) { padding ->
+        OwnerDashboard(
+            restaurant = restaurant,
+            todaysBookings = state.todaysBookings,
+            onEditRestaurant = onEditRestaurant,
+            onViewBookings = onViewBookings,
+            modifier = Modifier.padding(padding),
+        )
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun ListingEditor(
+    state: OwnerPortalUiState,
+    restaurant: Restaurant,
+    onSave: (Restaurant) -> Unit,
+    onBack: () -> Unit,
+) {
+    Scaffold(
+        contentWindowInsets = WindowInsets(0, 0, 0, 0),
+        topBar = {
+            TopAppBar(
+                title = { Text("Edit listing") },
+                navigationIcon = {
+                    IconButton(onClick = onBack) {
+                        Icon(
+                            Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = "Back",
+                        )
+                    }
+                },
+            )
+        },
+    ) { padding ->
+        EditRestaurantScreen(
+            restaurant = restaurant,
+            saving = state.isSaving,
+            onSave = onSave,
+            modifier = Modifier.padding(padding),
+        )
+    }
+}
