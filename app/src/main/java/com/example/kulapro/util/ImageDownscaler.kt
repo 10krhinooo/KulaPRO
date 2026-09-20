@@ -7,20 +7,27 @@ import java.io.ByteArrayOutputStream
 import java.io.InputStream
 
 /**
- * Turns a picked image into a small data URI suitable for storing inline.
+ * Shrinks a picked or captured image before anything is done with it.
  *
- * Avatars live in the user's Firestore document rather than in Cloud Storage. At
- * [MAX_DIMENSION] pixels a JPEG lands around 20KB, comfortably inside Firestore's 1 MiB
- * document limit, and it needs no Storage bucket, no bucket rules and no extra billing.
- * Larger imagery, such as restaurant photography, does not belong here.
+ * Two callers with two very different bounds. An avatar at [AVATAR_DIMENSION] pixels lands
+ * around 20KB, comfortably inside Firestore's 1 MiB document limit, so it needs no Storage
+ * bucket, no bucket rules and no extra billing. A dish photographed for the scanner goes to
+ * [SCAN_DIMENSION], which is where Claude's vision resolution tops out: anything larger
+ * costs tokens without buying accuracy.
  *
  * Takes stream factories rather than a Context and a Uri so the scaling behaviour can be
  * tested directly, without a ContentResolver.
  */
 object ImageDownscaler {
 
-    const val MAX_DIMENSION = 256
+    /** Big enough to recognise a face in a list row, small enough to store in a document. */
+    const val AVATAR_DIMENSION = 256
+
+    /** Claude's effective vision resolution on the long edge. Beyond this is waste. */
+    const val SCAN_DIMENSION = 1568
+
     private const val JPEG_QUALITY = 80
+    private const val SCAN_JPEG_QUALITY = 85
     private const val DATA_URI_PREFIX = "data:image/jpeg;base64,"
 
     /**
@@ -29,36 +36,55 @@ object ImageDownscaler {
      * @return a `data:` URI, or null if the image could not be read.
      */
     fun toDataUri(openStream: () -> InputStream?): String? {
-        val bitmap = decodeScaled(openStream) ?: return null
+        val bitmap = decodeScaled(openStream, AVATAR_DIMENSION) ?: return null
         return try {
-            val output = ByteArrayOutputStream()
-            bitmap.compress(Bitmap.CompressFormat.JPEG, JPEG_QUALITY, output)
-            DATA_URI_PREFIX + Base64.encodeToString(output.toByteArray(), Base64.NO_WRAP)
+            DATA_URI_PREFIX + Base64.encodeToString(compress(bitmap, JPEG_QUALITY), Base64.NO_WRAP)
         } finally {
             bitmap.recycle()
         }
     }
 
-    private fun decodeScaled(openStream: () -> InputStream?): Bitmap? {
+    /**
+     * Bare base64 rather than a data URI, because the scanner sends the bytes in a JSON
+     * field and a URI prefix would be a hundred wasted characters on every scan.
+     *
+     * @return base64 JPEG, or null if the image could not be read.
+     */
+    fun toScanBase64(openStream: () -> InputStream?): String? {
+        val bitmap = decodeScaled(openStream, SCAN_DIMENSION) ?: return null
+        return try {
+            Base64.encodeToString(compress(bitmap, SCAN_JPEG_QUALITY), Base64.NO_WRAP)
+        } finally {
+            bitmap.recycle()
+        }
+    }
+
+    private fun compress(bitmap: Bitmap, quality: Int): ByteArray {
+        val output = ByteArrayOutputStream()
+        bitmap.compress(Bitmap.CompressFormat.JPEG, quality, output)
+        return output.toByteArray()
+    }
+
+    private fun decodeScaled(openStream: () -> InputStream?, bound: Int): Bitmap? {
         val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
         openStream()?.use { BitmapFactory.decodeStream(it, null, bounds) } ?: return null
 
         val options = BitmapFactory.Options().apply {
-            inSampleSize = sampleSizeFor(bounds.outWidth, bounds.outHeight)
+            inSampleSize = sampleSizeFor(bounds.outWidth, bounds.outHeight, bound)
         }
         val decoded = openStream()?.use {
             BitmapFactory.decodeStream(it, null, options)
         } ?: return null
 
-        return scaleToBound(decoded)
+        return scaleToBound(decoded, bound)
     }
 
-    /** Scales [source] so its longest edge is at most [MAX_DIMENSION], preserving aspect. */
-    internal fun scaleToBound(source: Bitmap): Bitmap {
+    /** Scales [source] so its longest edge is at most [bound], preserving aspect. */
+    internal fun scaleToBound(source: Bitmap, bound: Int = AVATAR_DIMENSION): Bitmap {
         val longest = maxOf(source.width, source.height)
-        if (longest <= MAX_DIMENSION) return source
+        if (longest <= bound) return source
 
-        val scale = MAX_DIMENSION.toFloat() / longest
+        val scale = bound.toFloat() / longest
         val scaled = Bitmap.createScaledBitmap(
             source,
             (source.width * scale).toInt().coerceAtLeast(1),
@@ -72,13 +98,13 @@ object ImageDownscaler {
     /**
      * The power-of-two subsampling factor BitmapFactory should use.
      *
-     * Halves while the result would still be at least [MAX_DIMENSION], so decoding never
-     * undershoots the target and loses quality.
+     * Halves while the result would still be at least [bound], so decoding never undershoots
+     * the target and loses quality.
      */
-    internal fun sampleSizeFor(width: Int, height: Int): Int {
+    internal fun sampleSizeFor(width: Int, height: Int, bound: Int = AVATAR_DIMENSION): Int {
         var sample = 1
         var longest = maxOf(width, height)
-        while (longest / 2 >= MAX_DIMENSION) {
+        while (longest / 2 >= bound) {
             longest /= 2
             sample *= 2
         }

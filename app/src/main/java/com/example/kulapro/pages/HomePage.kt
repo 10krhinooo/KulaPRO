@@ -14,11 +14,13 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.PhotoCamera
 import androidx.compose.material.icons.outlined.Restaurant
 import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -64,6 +66,8 @@ fun HomePage(
     isSignedIn: Boolean = false,
     managedRestaurantId: String? = null,
     isReviewer: Boolean = false,
+    /** Null when no scanner is configured, or when nobody is signed in to charge it to. */
+    onScanDish: (() -> Unit)? = null,
     repository: RestaurantRepository = remember { RestaurantRepositoryFirestore() },
     appContext: android.content.Context = LocalContext.current.applicationContext,
     profileRepository: ProfileRepository = remember { AuthRepositoryFirebase(appContext) },
@@ -94,6 +98,17 @@ fun HomePage(
         // Insets are owned by the navigation Scaffold; applying them again here would
         // double count the navigation bar height.
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
+        floatingActionButton = {
+            // The scanner's front door. On Home rather than buried in a menu, because it is
+            // the one thing in the app a diner might open it for without wanting a table.
+            onScanDish?.let {
+                ExtendedFloatingActionButton(
+                    onClick = it,
+                    icon = { Icon(Icons.Outlined.PhotoCamera, contentDescription = null) },
+                    text = { Text("Scan a dish") },
+                )
+            }
+        },
         topBar = {
             // Left aligned rather than centred: with a portal switcher and two icons in the
             // actions slot, a centred title is squeezed into a column narrow enough to wrap

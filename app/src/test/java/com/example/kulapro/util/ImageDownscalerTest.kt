@@ -42,8 +42,8 @@ class ImageDownscalerTest {
         val wide = Bitmap.createBitmap(1000, 500, Bitmap.Config.ARGB_8888)
         val scaled = ImageDownscaler.scaleToBound(wide)
 
-        assertEquals(ImageDownscaler.MAX_DIMENSION, scaled.width)
-        assertEquals(ImageDownscaler.MAX_DIMENSION / 2, scaled.height)
+        assertEquals(ImageDownscaler.AVATAR_DIMENSION, scaled.width)
+        assertEquals(ImageDownscaler.AVATAR_DIMENSION / 2, scaled.height)
     }
 
     @Test
@@ -58,7 +58,7 @@ class ImageDownscalerTest {
         val sliver = Bitmap.createBitmap(4000, 1, Bitmap.Config.ARGB_8888)
         val scaled = ImageDownscaler.scaleToBound(sliver)
 
-        assertEquals(ImageDownscaler.MAX_DIMENSION, scaled.width)
+        assertEquals(ImageDownscaler.AVATAR_DIMENSION, scaled.width)
         assertTrue("height must stay positive", scaled.height >= 1)
     }
 
@@ -79,5 +79,35 @@ class ImageDownscalerTest {
         assertNotNull(dataUri)
         assertTrue(dataUri!!.startsWith("data:image/jpeg;base64,"))
         assertTrue("payload should not be empty", dataUri.substringAfter("base64,").isNotEmpty())
+    }
+
+    @Test
+    fun `a scan is allowed the resolution the model can actually use`() {
+        val source = Bitmap.createBitmap(4000, 3000, Bitmap.Config.ARGB_8888)
+
+        val scaled = ImageDownscaler.scaleToBound(source, ImageDownscaler.SCAN_DIMENSION)
+
+        assertEquals(ImageDownscaler.SCAN_DIMENSION, scaled.width)
+        assertEquals(ImageDownscaler.SCAN_DIMENSION * 3 / 4, scaled.height)
+    }
+
+    @Test
+    fun `a photo already inside the scan bound is left alone rather than upscaled`() {
+        val source = Bitmap.createBitmap(1000, 800, Bitmap.Config.ARGB_8888)
+
+        val scaled = ImageDownscaler.scaleToBound(source, ImageDownscaler.SCAN_DIMENSION)
+
+        assertEquals(1000, scaled.width)
+        assertEquals(800, scaled.height)
+    }
+
+    @Test
+    fun `decoding a scan subsamples towards the larger bound, not the avatar one`() {
+        val forScan = ImageDownscaler.sampleSizeFor(4000, 3000, ImageDownscaler.SCAN_DIMENSION)
+        val forAvatar = ImageDownscaler.sampleSizeFor(4000, 3000, ImageDownscaler.AVATAR_DIMENSION)
+
+        assertEquals(2, forScan)
+        // A scan keeps far more of the original, which is the whole point of the two bounds.
+        assertEquals(8, forAvatar)
     }
 }

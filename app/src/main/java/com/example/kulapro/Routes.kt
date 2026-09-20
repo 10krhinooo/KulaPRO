@@ -17,6 +17,7 @@ object Routes {
     const val CLAIM_RESTAURANT = "claim/{restaurantId}/{restaurantName}"
     const val LIST_RESTAURANT = "listRestaurant"
     const val OWNERSHIP_REVIEW = "ownershipReview"
+    const val SCANNER = "scanner"
 
     fun claimRestaurant(restaurantId: String, restaurantName: String): String =
         "claim/$restaurantId/${encode(restaurantName)}"

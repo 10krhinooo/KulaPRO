@@ -20,6 +20,11 @@ val localProperties = Properties().apply {
 }
 val mapsApiKey: String = localProperties.getProperty("MAPS_API_KEY") ?: ""
 
+// Where the scanner proxy lives. Not a secret, but it is per developer and per deployment,
+// so it is configured rather than committed. An empty value is a supported state: the app
+// builds and simply does not offer to scan, so a checkout with no Cloudflare account works.
+val scannerUrl: String = localProperties.getProperty("SCANNER_URL") ?: ""
+
 android {
     namespace = "com.example.kulapro"
     compileSdk = 35
@@ -42,6 +47,7 @@ android {
         vectorDrawables { useSupportLibrary = true }
 
         manifestPlaceholders["MAPS_API_KEY"] = mapsApiKey
+        buildConfigField("String", "SCANNER_URL", "\"$scannerUrl\"")
     }
 
     buildTypes {
@@ -110,6 +116,11 @@ dependencies {
     ksp(libs.hilt.compiler)
 
     // Settings that survive a reinstall, and reminders that fire without a server.
+    // Declared rather than relied on transitively through Coil: the scanner is the only
+    // thing in the app that talks to a server which is not Firebase, and an implicit
+    // dependency is one a Coil upgrade can take away.
+    implementation(libs.okhttp)
+
     implementation(libs.androidx.core.splashscreen)
     implementation(libs.androidx.datastore.preferences)
     implementation(libs.androidx.work.runtime.ktx)
@@ -182,6 +193,7 @@ kover {
                     "com.example.kulapro.feature.*ViewModel",
                     "com.example.kulapro.feature.reminders.BookingReminder",
                     "com.example.kulapro.data.settings.*",
+                    "com.example.kulapro.data.scanner.*",
                     "com.example.kulapro.feature.*UiState*",
                     "com.example.kulapro.feature.*UiStateKt",
                 )

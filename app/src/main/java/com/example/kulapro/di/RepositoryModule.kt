@@ -14,6 +14,8 @@ import com.example.kulapro.data.repository.RestaurantRepository
 import com.example.kulapro.data.repository.RestaurantRepositoryFirestore
 import com.example.kulapro.data.repository.ReviewRepository
 import com.example.kulapro.data.repository.ReviewRepositoryFirestore
+import com.example.kulapro.data.scanner.ScannerRepository
+import com.example.kulapro.data.scanner.ScannerRepositoryHttp
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import dagger.Module
@@ -76,4 +78,20 @@ object RepositoryModule {
         firestore: FirebaseFirestore,
         auth: FirebaseAuth,
     ): OwnershipRepository = OwnershipRepositoryFirestore(firestore, auth)
+
+    /**
+     * The scanner proxy, if this build was given one.
+     *
+     * The URL comes from local.properties through BuildConfig rather than from the source
+     * tree, because it is per deployment. An empty value is a supported state: the
+     * repository reports itself unavailable and the app never offers to scan.
+     */
+    @Provides
+    @Singleton
+    fun scannerRepository(
+        auth: FirebaseAuth,
+    ): ScannerRepository = ScannerRepositoryHttp(
+        baseUrl = com.example.kulapro.BuildConfig.SCANNER_URL,
+        auth = auth,
+    )
 }

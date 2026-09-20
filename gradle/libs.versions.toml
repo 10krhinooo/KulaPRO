@@ -17,6 +17,7 @@ composeBom = "2024.11.00"
 
 # DI
 coreSplashscreen = "1.0.1"
+okhttp = "4.12.0"
 datastore = "1.1.1"
 hilt = "2.53"
 hiltWork = "1.2.0"
@@ -68,6 +69,7 @@ androidx-material3 = { group = "androidx.compose.material3", name = "material3" 
 androidx-material-icons-extended = { group = "androidx.compose.material", name = "material-icons-extended" }
 
 # Hilt
+okhttp = { group = "com.squareup.okhttp3", name = "okhttp", version.ref = "okhttp" }
 androidx-core-splashscreen = { group = "androidx.core", name = "core-splashscreen", version.ref = "coreSplashscreen" }
 androidx-datastore-preferences = { group = "androidx.datastore", name = "datastore-preferences", version.ref = "datastore" }
 androidx-work-runtime-ktx = { group = "androidx.work", name = "work-runtime-ktx", version.ref = "work" }

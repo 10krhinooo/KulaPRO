@@ -42,6 +42,7 @@ import com.example.kulapro.data.repository.Result
 import com.example.kulapro.feature.owner.OwnerPortal
 import com.example.kulapro.feature.ownership.OwnershipRequestScreen
 import com.example.kulapro.feature.ownership.OwnershipReviewScreen
+import com.example.kulapro.feature.scanner.ScannerScreen
 import com.example.kulapro.pages.AboutScreen
 import com.example.kulapro.pages.ForgotPasswordScreen
 import com.example.kulapro.pages.HomePage
@@ -85,6 +86,10 @@ fun KulaProNavigation(
         .collectAsStateWithLifecycle(initialValue = authRepository.currentUserId)
     var managedRestaurants by remember { mutableStateOf<List<String>>(emptyList()) }
     var isReviewer by remember { mutableStateOf(false) }
+
+    // A build with no scanner URL in local.properties simply does not offer to scan, so a
+    // checkout without a Cloudflare deployment still works.
+    val canScan = BuildConfig.SCANNER_URL.isNotBlank()
     LaunchedEffect(signedInUserId) {
         if (signedInUserId == null) {
             managedRestaurants = emptyList()
@@ -205,6 +210,14 @@ fun KulaProNavigation(
                     isSignedIn = signedInUserId != null,
                     managedRestaurantId = managedRestaurants.firstOrNull(),
                     isReviewer = isReviewer,
+                    // Only offered when a scanner is configured and the user is signed in,
+                    // since a scan is counted against their daily quota and therefore has
+                    // to belong to somebody.
+                    onScanDish = if (canScan && signedInUserId != null) {
+                        { navController.navigate(Routes.SCANNER) }
+                    } else {
+                        null
+                    },
                     onSwitchToHosting = { restaurantId ->
                         navController.navigate(Routes.owner(restaurantId))
                     },
@@ -262,6 +275,10 @@ fun KulaProNavigation(
 
             composable(Routes.LIST_RESTAURANT) {
                 OwnershipRequestScreen(onBack = { navController.popBackStack() })
+            }
+
+            composable(Routes.SCANNER) {
+                ScannerScreen(onBack = { navController.popBackStack() })
             }
 
             composable(Routes.OWNERSHIP_REVIEW) {
