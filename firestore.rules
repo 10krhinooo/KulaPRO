@@ -1,0 +1,286 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ---- helpers -------------------------------------------------------------
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    // A single sitting cannot hold more than this, and one booking cannot move the seat
+    // counter by more than one party. Both bound what a client write is able to do.
+    function MAX_SEATS_PER_SLOT() { return 500; }
+    function MAX_PARTY_SIZE() { return 20; }
+    function MAX_TABLES_PER_SLOT() { return 200; }
+
+
+    function isSelf(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    // Authorisation reads Firebase Auth custom claims, never a Firestore field.
+    // A `role` field in a user's own document is writable by that user, so gating on
+    // it would let any client promote itself to owner.
+    function role() {
+      return isSignedIn() ? request.auth.token.get('role', 'DINER') : 'DINER';
+    }
+
+    function isPlatformAdmin() {
+      return role() == 'PLATFORM_ADMIN';
+    }
+
+    // Ownership has two sources and neither can be granted by the person it empowers.
+    //
+    // A custom claim is signed by Firebase, so a client cannot forge one, but only trusted
+    // server code can issue one, which meant every grant needed a privileged script.
+    // The ownerUserId field closes that gap: it sits on the restaurant document, where the
+    // rule below lets only a platform admin write it, so an approval takes effect the
+    // moment a reviewer taps it while still being a decision no ordinary user can make.
+    //
+    // The cost is one extra document read per owner write. At this number of restaurants
+    // that is the right trade for not needing a deploy to hand someone their own listing.
+    function managesRestaurant(restaurantId) {
+      return isSignedIn() && (
+        isPlatformAdmin() ||
+        restaurantId in request.auth.token.get('managedRestaurants', []) ||
+        (
+          exists(/databases/$(database)/documents/restaurants/$(restaurantId)) &&
+          get(/databases/$(database)/documents/restaurants/$(restaurantId))
+            .data.get('ownerUserId', '') == request.auth.uid
+        )
+      );
+    }
+
+    // ---- users ---------------------------------------------------------------
+
+    match /users/{userId} {
+      // The platform check is first on purpose. A rule is evaluated against a query before
+      // the query runs, and a condition that depends on the document being read cannot be
+      // proved for a collection the caller has not filtered. Leading with a condition that
+      // depends only on the caller is what lets an admin count registered accounts at all.
+      allow read: if isPlatformAdmin() || isSelf(userId);
+
+      // On create the role must be the default. On update it must not change.
+      // Privilege is granted only by a Cloud Function setting a custom claim.
+      allow create: if isSelf(userId)
+                    && request.resource.data.get('role', 'DINER') == 'DINER';
+
+      allow update: if isSelf(userId)
+                    && request.resource.data.get('role', 'DINER')
+                       == resource.data.get('role', 'DINER');
+
+      allow delete: if false;
+
+      // Restaurants this diner has kept. Nobody else's business, including a reviewer's:
+      // what someone likes is not a moderation question.
+      match /favourites/{restaurantId} {
+        allow read, write: if isSelf(userId);
+      }
+    }
+
+    // ---- restaurants and menus ----------------------------------------------
+
+    match /restaurants/{restaurantId} {
+      allow read: if true;
+
+      // Creating and deleting a listing is a platform decision, so a new restaurant only
+      // appears when a reviewer approves the request asking for it.
+      allow create, delete: if isPlatformAdmin();
+
+      // An owner runs their restaurant but cannot hand it on or take another. Pinning
+      // ownerUserId to its current value is what stops a granted owner from granting.
+      allow update: if isPlatformAdmin() || (
+        managesRestaurant(restaurantId) &&
+        request.resource.data.get('ownerUserId', '')
+          == resource.data.get('ownerUserId', '')
+      );
+
+      match /menuItems/{menuItemId} {
+        allow read: if true;
+        allow write: if managesRestaurant(restaurantId);
+      }
+
+      // The floor plan. World readable so a diner can pick a table before signing in, and
+      // writable only by the restaurant, because the plan is a statement about the room.
+      match /tables/{tableId} {
+        allow read: if true;
+        allow write: if managesRestaurant(restaurantId);
+      }
+
+      // Denormalised counters are maintained only by trusted server code.
+      match /stats/{statId} {
+        allow read: if managesRestaurant(restaurantId);
+        allow write: if false;
+      }
+
+      // Public per-slot seat counters. These carry no personal data, which is the whole
+      // point of them: a diner needs to know whether a sitting is full without being able
+      // to read who else is booked.
+      //
+      // Booking is a client-side transaction, so a diner has to be able to write the
+      // counter alongside their own reservation. The write is fenced in rather than
+      // trusted: the document id must be the slot start it claims, the count must stay
+      // non-negative, and a single write may not move it by more than one large party.
+      // That stops a client from zeroing a full restaurant or fabricating a full one,
+      // though it cannot stop a determined client from nudging its own slot. Moving the
+      // counter into a Firestore trigger removes client write access altogether and is
+      // the right next step once functions are deployed.
+      match /slots/{slotId} {
+        allow read: if true;
+
+        allow write: if managesRestaurant(restaurantId) || (
+          isSignedIn()
+          && request.resource.data.restaurantId == restaurantId
+          && request.resource.data.startsAtSeconds is int
+          && string(request.resource.data.startsAtSeconds) == slotId
+          && request.resource.data.seatsTaken is int
+          && request.resource.data.seatsTaken >= 0
+          && request.resource.data.seatsTaken <= MAX_SEATS_PER_SLOT()
+          && (
+            resource == null
+            || math.abs(request.resource.data.seatsTaken - resource.data.seatsTaken)
+               <= MAX_PARTY_SIZE()
+          )
+          // One booking claims or releases at most one table, so a client cannot empty a
+          // full room or mark every table taken in a single write.
+          && request.resource.data.get('takenTableIds', []).size() <= MAX_TABLES_PER_SLOT()
+          && (
+            resource == null
+            || math.abs(
+                 request.resource.data.get('takenTableIds', []).size()
+                 - resource.data.get('takenTableIds', []).size()
+               ) <= 1
+          )
+        );
+      }
+
+      match /reviews/{reviewId} {
+        allow read: if true;
+
+        // A review is only accepted when the author actually ate there: the referenced
+        // reservation must belong to them and be COMPLETED. This makes fake reviews
+        // structurally hard rather than merely discouraged.
+        allow create: if isSignedIn()
+          && request.resource.data.userId == request.auth.uid
+          && request.resource.data.restaurantId == restaurantId
+          && request.resource.data.rating is int
+          && request.resource.data.rating >= 1
+          && request.resource.data.rating <= 5
+          && exists(/databases/$(database)/documents/reservations/$(request.resource.data.reservationId))
+          && get(/databases/$(database)/documents/reservations/$(request.resource.data.reservationId)).data.userId == request.auth.uid
+          && get(/databases/$(database)/documents/reservations/$(request.resource.data.reservationId)).data.restaurantId == restaurantId
+          && get(/databases/$(database)/documents/reservations/$(request.resource.data.reservationId)).data.status == 'COMPLETED';
+
+        // Authors may edit their own text; the owner may only add a reply.
+        allow update: if (isSignedIn() && resource.data.userId == request.auth.uid
+                          && request.resource.data.userId == resource.data.userId
+                          && request.resource.data.reservationId == resource.data.reservationId)
+                      || managesRestaurant(restaurantId);
+
+        allow delete: if isSignedIn() && resource.data.userId == request.auth.uid;
+      }
+    }
+
+    // ---- ownership requests --------------------------------------------------
+
+    match /ownershipRequests/{requestId} {
+      // A requester sees their own, a reviewer sees all of them. Nobody else sees any:
+      // these carry a phone number and a stated connection to a business.
+      allow read: if isPlatformAdmin() || (
+        isSignedIn() && resource.data.userId == request.auth.uid
+      );
+
+      // Anyone signed in may ask. The request is a statement, not a grant, and asking is
+      // the only part of this a user is trusted with.
+      allow create: if isSignedIn()
+        && request.resource.data.userId == request.auth.uid
+        && request.resource.data.status == 'PENDING'
+        && request.resource.data.type in ['CLAIM', 'NEW_LISTING']
+        && request.resource.data.get('reviewedBy', '') == ''
+        && request.resource.data.get('reviewNote', '') == '';
+
+      // Only a reviewer decides, and only on a request still waiting. Without the second
+      // condition an approval could be replayed over a rejection.
+      allow update: if isPlatformAdmin()
+        && resource.data.status == 'PENDING'
+        && request.resource.data.userId == resource.data.userId
+        && request.resource.data.status in ['APPROVED', 'REJECTED'];
+
+      // Kept, so there is a record of who asked for what and who decided.
+      allow delete: if false;
+    }
+
+    // ---- reservations --------------------------------------------------------
+
+    match /reservations/{reservationId} {
+      // Platform first, again so the admin console can ask about every booking at once
+      // rather than one restaurant at a time. A diner still only ever sees their own, and a
+      // restaurant only the bookings made with it.
+      allow read: if isPlatformAdmin() || (
+        isSignedIn() && (
+          resource.data.userId == request.auth.uid ||
+          managesRestaurant(resource.data.restaurantId)
+        )
+      );
+
+      // userId is pinned to the caller, so a client cannot book on someone else's behalf
+      // or write a reservation it would then be unable to read.
+      allow create: if isSignedIn()
+        && request.resource.data.partySize is int
+        && request.resource.data.partySize > 0
+        && (
+          // A diner booking for themselves.
+          (
+            request.resource.data.userId == request.auth.uid
+            && request.resource.data.status == 'PENDING'
+            && request.resource.data.get('isWalkIn', false) == false
+          )
+          // Or the restaurant recording a party it seated without a booking, so the
+          // capacity model reflects the room rather than only what came through the app.
+          // A walk-in has no user, and saying so is what keeps it out of anyone's list.
+          || (
+            managesRestaurant(request.resource.data.restaurantId)
+            && request.resource.data.get('isWalkIn', false) == true
+            && request.resource.data.get('userId', '') == ''
+          )
+        );
+
+      // Diners may change their own booking but never reassign its owner.
+      allow update: if isSignedIn() && (
+        (resource.data.userId == request.auth.uid
+          && request.resource.data.userId == resource.data.userId)
+        || managesRestaurant(resource.data.restaurantId)
+      );
+
+      // Cancellation is a status change, so history and analytics stay intact.
+      allow delete: if false;
+    }
+
+    // ---- scanner cache -------------------------------------------------------
+
+    // Written only by the Cloud Function (Admin SDK bypasses rules). Clients may read a
+    // cached result but must never be able to poison it.
+    match /nutritionCache/{hash} {
+      allow read: if isSignedIn();
+      allow write: if false;
+    }
+
+    // The same public seat counters, reachable as a collection group.
+    //
+    // Home asks one question of every restaurant at once, "who has a table tonight", and
+    // without this it would have to ask each restaurant separately: a read per listing on
+    // every load. A path rule is needed because a collection group query is not covered by
+    // the nested match above. These carry no personal data, which is what makes the
+    // question answerable without granting sight of anyone's booking.
+    match /{path=**}/slots/{slotId} {
+      allow read: if true;
+    }
+
+    // Anything not matched above is denied.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

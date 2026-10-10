@@ -1,0 +1,21 @@
+[
+  { "id": "r-bistro-1", "restaurantId": "the-bistro", "authorName": "Wanjiru M.", "rating": 5, "daysAgo": 6, "comment": "The steak frites is the best in Westlands and I will argue about it. Booked at seven, seated at seven." },
+  { "id": "r-bistro-2", "restaurantId": "the-bistro", "authorName": "Daniel O.", "rating": 4, "daysAgo": 19, "comment": "Lovely room, slightly slow on a full Friday. Worth it for the onion soup.", "ownerReply": "Thank you Daniel. We have added a second section server on Fridays since." },
+  { "id": "r-sushi-1", "restaurantId": "sushi-den", "authorName": "Aisha K.", "rating": 5, "daysAgo": 3, "comment": "Sat at the counter for the omakase. Twelve pieces, not one of them ordinary." },
+  { "id": "r-sushi-2", "restaurantId": "sushi-den", "authorName": "Peter G.", "rating": 5, "daysAgo": 27, "comment": "Expensive and completely worth it. Book early, there are only sixteen seats." },
+  { "id": "r-grill-1", "restaurantId": "the-grill", "authorName": "Brian K.", "rating": 5, "daysAgo": 2, "comment": "Came with eight people on a Saturday and the table was ready. That never happens." },
+  { "id": "r-grill-2", "restaurantId": "the-grill", "authorName": "Mercy N.", "rating": 4, "daysAgo": 11, "comment": "Goat was excellent, ugali could have been hotter. Kachumbari on point." },
+  { "id": "r-grill-3", "restaurantId": "the-grill", "authorName": "Tom A.", "rating": 4, "daysAgo": 34, "comment": "Loud, smoky, exactly what you want on a Sunday afternoon." },
+  { "id": "r-forno-1", "restaurantId": "forno-pizza", "authorName": "Lucy W.", "rating": 5, "daysAgo": 5, "comment": "Proper leopard spotting on the crust. The diavola with the chilli honey is dangerous." },
+  { "id": "r-forno-2", "restaurantId": "forno-pizza", "authorName": "Sam R.", "rating": 3, "daysAgo": 22, "comment": "Pizza was great but we waited forty minutes past our booking.", "ownerReply": "That is not our standard and we are sorry. Please get in touch, we would like to make it right." },
+  { "id": "r-mama-1", "restaurantId": "mama-oliech", "authorName": "Kevin M.", "rating": 5, "daysAgo": 1, "comment": "The whole tilapia is a religious experience. Go hungry." },
+  { "id": "r-mama-2", "restaurantId": "mama-oliech", "authorName": "Grace A.", "rating": 5, "daysAgo": 9, "comment": "Busy, loud, and the fish arrives when it arrives. Booking through the app meant we actually had a table." },
+  { "id": "r-spice-1", "restaurantId": "spice-route", "authorName": "Ravi S.", "rating": 5, "daysAgo": 4, "comment": "Dal makhani tastes like someone left it on overnight, because they did." },
+  { "id": "r-spice-2", "restaurantId": "spice-route", "authorName": "Nadia H.", "rating": 4, "daysAgo": 16, "comment": "Great butter chicken. Ask for the naan to come out last, ours arrived early and went cold." },
+  { "id": "r-habesha-1", "restaurantId": "habesha-table", "authorName": "Selam T.", "rating": 5, "daysAgo": 7, "comment": "Injera made in house and you can taste the difference. The coffee ceremony is worth staying for." },
+  { "id": "r-swahili-1", "restaurantId": "swahili-plate", "authorName": "Fatma J.", "rating": 4, "daysAgo": 13, "comment": "Biryani close to what I grew up with in Mombasa. High praise from me." },
+  { "id": "r-wok-1", "restaurantId": "golden-wok", "authorName": "Ellen C.", "rating": 4, "daysAgo": 8, "comment": "Dim sum until three is a real commitment and they keep it. Har gow were excellent." },
+  { "id": "r-tacos-1", "restaurantId": "casa-tacos", "authorName": "Jose L.", "rating": 4, "daysAgo": 10, "comment": "They nixtamalise their own corn. In Nairobi. The al pastor is the one to get." },
+  { "id": "r-olive-1", "restaurantId": "olive-and-thyme", "authorName": "Yusuf A.", "rating": 5, "daysAgo": 12, "comment": "Mezze for two easily feeds three. The lamb shish came off the charcoal perfectly." },
+  { "id": "r-green-1", "restaurantId": "green-room", "authorName": "Hannah B.", "rating": 4, "daysAgo": 15, "comment": "Shakshuka and good coffee in a garden. Gets busy from nine on a Saturday, book ahead." }
+]

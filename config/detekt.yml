@@ -1,0 +1,63 @@
+build:
+  maxIssues: 0
+
+complexity:
+  LongMethod:
+    active: true
+    threshold: 120
+    # A @Composable is a declarative layout tree, not procedural logic: its length tracks
+    # how much UI it describes. Splitting one to satisfy a line count makes it harder to
+    # read, so the rule is scoped to real functions.
+    ignoreAnnotated: ['Composable']
+  CyclomaticComplexMethod:
+    active: true
+    threshold: 15
+    ignoreAnnotated: ['Composable']
+  LongParameterList:
+    active: true
+    functionThreshold: 8
+    constructorThreshold: 10
+    ignoreDefaultParameters: true
+  TooManyFunctions:
+    active: true
+    thresholdInFiles: 25
+    thresholdInClasses: 20
+
+style:
+  MagicNumber:
+    active: true
+    ignorePropertyDeclaration: true
+    ignoreCompanionObjectPropertyDeclaration: true
+    ignoreAnnotation: true
+    ignoreNamedArgument: true
+    # dp and sp literals in Compose layouts are the readable form; extracting each into a
+    # named constant makes layout code harder to follow, not easier.
+    ignoreNumbers: ['-1', '0', '1', '2', '3', '4', '8', '12', '16', '20', '24', '32', '60', '100']
+  MaxLineLength:
+    active: true
+    maxLineLength: 100
+    excludeCommentStatements: false
+  ReturnCount:
+    active: true
+    # The opening-hours parsers reject malformed input a step at a time with elvis returns.
+    # Six early exits reads more clearly there than nesting or a Result type, and those
+    # functions are covered at 100%, so the shape is verified rather than assumed.
+    max: 6
+    excludeGuardClauses: true
+  UnusedPrivateMember:
+    active: true
+
+naming:
+  FunctionNaming:
+    active: true
+    # @Composable functions are conventionally PascalCase.
+    ignoreAnnotated: ['Composable']
+  TopLevelPropertyNaming:
+    active: true
+    constantPattern: '[A-Z][_A-Z0-9]*'
+
+exceptions:
+  TooGenericExceptionCaught:
+    active: false
+  SwallowedException:
+    active: true

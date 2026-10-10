@@ -1,22 +1,18 @@
 package com.example.kulapro.pages
 
+import android.app.Activity
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Email
 import androidx.compose.material.icons.rounded.Lock
-import androidx.compose.material3.Button
-import androidx.compose.material3.Icon
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Snackbar
+import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -27,253 +23,173 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
-import com.google.firebase.Firebase
-import com.google.firebase.auth.auth
-import kotlinx.coroutines.channels.awaitClose
-import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.callbackFlow
-import kotlinx.coroutines.flow.launchIn
-import kotlinx.coroutines.flow.onEach
-
-class AuthenticationManager {
-    private val auth = Firebase.auth
-
-    fun createAccountWithEmail(email: String, password: String): Flow<AuthResponse> = callbackFlow {
-        if (email.isEmpty() || password.isEmpty()) {
-            trySend(AuthResponse.Error("Please fill all fields"))
-            return@callbackFlow
-        }
-
-        auth.createUserWithEmailAndPassword(email, password)
-            .addOnCompleteListener { task ->
-                if (task.isSuccessful) {
-                    trySend(AuthResponse.Success)
-                } else {
-                    trySend(AuthResponse.Error(message = task.exception?.message ?: "Something went wrong"))
-                }
-            }
-        awaitClose()
-    }
-
-    fun LoginWithEmail(email: String, password: String): Flow<AuthResponse> = callbackFlow {
-        if (email.isEmpty() || password.isEmpty()) {
-            trySend(AuthResponse.Error("Please fill all fields"))
-            return@callbackFlow
-        }
-
-        auth.signInWithEmailAndPassword(email, password)
-            .addOnCompleteListener { task ->
-                if (task.isSuccessful) {
-                    trySend(AuthResponse.Success)
-                } else {
-                    trySend(AuthResponse.Error(message = task.exception?.message ?: "Something went wrong"))
-                }
-            }
-        awaitClose()
-    }
-}
-
-
-interface AuthResponse  {
-    data  object Success: AuthResponse
-    data class Error (val message: String): AuthResponse
-
-}
-
-
-
+import com.example.kulapro.Routes
+import com.example.kulapro.data.repository.AuthRepository
+import com.example.kulapro.data.repository.AuthRepositoryFirebase
+import com.example.kulapro.data.repository.Result
+import com.example.kulapro.ui.components.AuthScaffold
+import com.example.kulapro.ui.components.KulaPasswordField
+import com.example.kulapro.ui.components.KulaTextField
+import com.example.kulapro.ui.components.MessageHost
+import com.example.kulapro.ui.components.PrimaryButton
+import com.example.kulapro.ui.components.SecondaryButton
+import com.example.kulapro.ui.components.rememberMessageHostState
+import com.example.kulapro.ui.components.shakeOnError
+import com.example.kulapro.util.Validators
+import kotlinx.coroutines.launch
 
 @Composable
-fun LoginPage (modifier: Modifier = Modifier,navController: NavController) {
-    var email by remember {
-        mutableStateOf("")
-    }
-    var password by remember {
-        mutableStateOf("")
-    }
+fun LoginPage(
+    navController: NavController,
+    modifier: Modifier = Modifier,
+    onSignedIn: () -> Unit = { navController.navigate(Routes.HOME) },
+    appContext: android.content.Context = LocalContext.current.applicationContext,
+    authRepository: AuthRepository = remember { AuthRepositoryFirebase(appContext) },
+) {
+    val scope = rememberCoroutineScope()
+    val messages = rememberMessageHostState()
+    val context = LocalContext.current
 
-    val authenticationManager = remember {
-        AuthenticationManager()
-    }
-    val coroutineScope = rememberCoroutineScope()
-    var feedbackMessage by remember { mutableStateOf("") }
-    var showSnackbar by remember { mutableStateOf(false) }
-    var formError by remember { mutableStateOf(false) }
+    var email by remember { mutableStateOf("") }
+    var password by remember { mutableStateOf("") }
+    var emailError by remember { mutableStateOf<String?>(null) }
+    var passwordError by remember { mutableStateOf<String?>(null) }
+    var isSubmitting by remember { mutableStateOf(false) }
+    // Bumped on every failed submit so the shake replays even for the same error text.
+    var errorNonce by remember { mutableStateOf<Int?>(null) }
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(20.dp),
-        verticalArrangement = Arrangement.Center
-    ) {
-        Text(text = "KulaPro",
-        style = MaterialTheme.typography.displayMedium,
-        fontWeight = FontWeight.Bold
-
-    )
-        Spacer(modifier = Modifier.height(20.dp) )
-
-        Text(text = "Login",
-            style = MaterialTheme.typography.displayMedium,
-            fontWeight = FontWeight.Bold,
-
-
-        )
-
-
-
-        Spacer(modifier = Modifier.height(20.dp) )
-
-
-        OutlinedTextField(
-            value = email,
-            onValueChange = { newValue ->
-                email = newValue
-                formError = false // Clear error when user starts typing
-            },
-            placeholder = { Text(text = "E-mail") },
-            leadingIcon = {
-                Icon(imageVector = Icons.Rounded.Email, contentDescription = null)
-            },
-            isError = formError && email.isEmpty(),
-            shape = RoundedCornerShape(20.dp),
-            modifier = Modifier.fillMaxWidth()
-        )
-        if (formError && email.isEmpty()) {
-            Text(
-                text = "Email is required",
-                color = MaterialTheme.colorScheme.error,
-                style = MaterialTheme.typography.bodySmall
-            )
+    fun submit() {
+        emailError = Validators.emailError(email)
+        passwordError = Validators.signInPasswordError(password)
+        if (emailError != null || passwordError != null) {
+            errorNonce = (errorNonce ?: 0) + 1
+            return
         }
+        isSubmitting = true
+        scope.launch {
+            val result = authRepository.signIn(email.trim(), password)
+            isSubmitting = false
+            when (result) {
+                is Result.Success -> onSignedIn()
 
-        Spacer(modifier = Modifier.height(10.dp))
-
-        OutlinedTextField(
-            value = password,
-            onValueChange = { newValue ->
-                password = newValue
-                formError = false // Clear error when user starts typing
-            },
-            placeholder = { Text(text = "Password") },
-            leadingIcon = {
-                Icon(imageVector = Icons.Rounded.Lock, contentDescription = null)
-            },
-
-            visualTransformation = PasswordVisualTransformation(),
-            isError = formError && password.isEmpty(),
-            shape = RoundedCornerShape(20.dp),
-            modifier = Modifier.fillMaxWidth()
-
-        )
-        if (formError && password.isEmpty()) {
-            Text(
-                text = "Password is required",
-                color = MaterialTheme.colorScheme.error,
-                style = MaterialTheme.typography.bodySmall
-            )
-        }
-
-        Spacer(modifier = Modifier.height(23.dp))
-
-        Button(
-            onClick = {
-                if (email.isEmpty() || password.isEmpty()) {
-                    formError = true
-                    feedbackMessage = "Please fill in all fields"
-                    showSnackbar = true
-                } else {
-                    authenticationManager.LoginWithEmail(email, password)
-                        .onEach { response ->
-                            when (response) {
-                                is AuthResponse.Success -> {
-                                    feedbackMessage = "Login successful"
-                                    navController.navigate("home")
-                                }
-                                is AuthResponse.Error -> {
-                                    feedbackMessage = response.message
-                                }
-                            }
-                            showSnackbar = true
-                        }.launchIn(coroutineScope)
+                is Result.Failure -> {
+                    errorNonce = (errorNonce ?: 0) + 1
+                    messages.showError(result.message)
                 }
-            },
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Text(
-                text = "Login",
-                fontWeight = FontWeight.Bold,
-                style = MaterialTheme.typography.titleMedium,
-                modifier = Modifier.padding(vertical = 4.dp)
-            )
-        }
-
-        if (showSnackbar) {
-            Snackbar(
-                modifier = Modifier.padding(8.dp),
-                action = {
-                    TextButton(onClick = { showSnackbar = false }) {
-                        Text("Dismiss")
-                    }
-                }
-            ) {
-                Text(feedbackMessage)
             }
         }
-        Spacer(modifier = Modifier.height(10.dp) )
-
-//        TextButton(onClick = {
-//            navController.navigate("register")
-//        }
-//        ) {
-//            Text(text = "Don't have an account, Register")
-//
-//        }
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(vertical = 12.dp),
-
-            contentAlignment = Alignment.Center
-        ){
-            Text(text = "Don't have an account ?")
-        }
-
-        Button(
-            onClick = {
-                navController.navigate("register")
-            },
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Text(
-                text = "Create an Account",
-                fontWeight = FontWeight.Bold,
-                style = MaterialTheme.typography.titleMedium,
-                modifier = Modifier.padding(vertical = 4.dp)
-            )
-        }
-            Spacer(modifier = Modifier.height(10.dp) )
-
-
-        Button(
-            onClick = {
-                navController.navigate("forgot")
-            },
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Text(
-                text = "Forgot Password",
-                fontWeight = FontWeight.Bold,
-                style = MaterialTheme.typography.titleMedium,
-                modifier = Modifier.padding(vertical = 4.dp)
-            )
-        }
-
-        }
     }
 
+    Scaffold(
+        modifier = modifier,
+        // Insets are owned by the navigation Scaffold; applying them again here would
+        // double count the navigation bar height.
+        contentWindowInsets = WindowInsets(0, 0, 0, 0),
+        snackbarHost = { MessageHost(messages) },
+    ) { padding ->
+        Box(Modifier.padding(padding)) {
+            AuthScaffold(
+                title = "Welcome back",
+                subtitle = "Sign in to book your table.",
+                onBack = if (navController.previousBackStackEntry != null) {
+                    { navController.popBackStack() }
+                } else {
+                    null
+                },
+            ) {
+                KulaTextField(
+                    value = email,
+                    onValueChange = {
+                        email = it
+                        emailError = null
+                    },
+                    label = "Email",
+                    leadingIcon = Icons.Rounded.Email,
+                    error = emailError,
+                    keyboardType = KeyboardType.Email,
+                    enabled = !isSubmitting,
+                    modifier = Modifier.shakeOnError(errorNonce?.takeIf { emailError != null }),
+                )
 
+                KulaPasswordField(
+                    value = password,
+                    onValueChange = {
+                        password = it
+                        passwordError = null
+                    },
+                    label = "Password",
+                    error = passwordError,
+                    enabled = !isSubmitting,
+                    modifier = Modifier.shakeOnError(errorNonce?.takeIf { passwordError != null }),
+                )
+
+                PrimaryButton(
+                    text = "Sign in",
+                    loadingText = "Signing in",
+                    loading = isSubmitting,
+                    onClick = ::submit,
+                )
+
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    HorizontalDivider(modifier = Modifier.weight(1f))
+                    Text(
+                        text = "or",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    HorizontalDivider(modifier = Modifier.weight(1f))
+                }
+
+                GoogleSignInButton(
+                    enabled = !isSubmitting,
+                    onClick = {
+                        val activity = context as? Activity ?: return@GoogleSignInButton
+                        isSubmitting = true
+                        scope.launch {
+                            val result = authRepository.signInWithGoogle(activity)
+                            isSubmitting = false
+                            when (result) {
+                                is Result.Success -> onSignedIn()
+
+                                is Result.Failure ->
+                                    messages.showError(result.message)
+                            }
+                        }
+                    },
+                )
+
+                TextButton(
+                    onClick = { navController.navigate(Routes.FORGOT) },
+                    modifier = Modifier.fillMaxWidth(),
+                ) { Text("Forgot your password?") }
+
+                SecondaryButton(
+                    text = "Create an account",
+                    onClick = { navController.navigate(Routes.REGISTER) },
+                    enabled = !isSubmitting,
+                )
+
+                // Browsing needs no account, so this screen must never be a dead end. It is
+                // reachable with an empty back stack after signing out, where popping would
+                // do nothing at all.
+                TextButton(
+                    onClick = {
+                        navController.navigate(Routes.HOME) {
+                            popUpTo(Routes.HOME) { inclusive = true }
+                        }
+                    },
+                    enabled = !isSubmitting,
+                    modifier = Modifier.fillMaxWidth(),
+                ) { Text("Continue as a guest") }
+            }
+        }
+    }
+}

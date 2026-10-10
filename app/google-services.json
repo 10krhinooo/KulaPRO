@@ -1,6 +1,7 @@
 {
   "project_info": {
     "project_number": "1088002844098",
+    "firebase_url": "https://kulapro-61969-default-rtdb.firebaseio.com",
     "project_id": "kulapro-61969",
     "storage_bucket": "kulapro-61969.firebasestorage.app"
   },
@@ -13,6 +14,14 @@
         }
       },
       "oauth_client": [
+        {
+          "client_id": "1088002844098-9c8j94b99066ot3fjh97lhpakbgjcoh6.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.kulapro",
+            "certificate_hash": "0a9157510ca960f2d4184949e44ae609e8da4529"
+          }
+        },
         {
           "client_id": "1088002844098-315qckkll82sa6s83fj5ap3dtdudhj3u.apps.googleusercontent.com",
           "client_type": 3
